@@ -21,7 +21,7 @@ class LayeredInfiniteZoom:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("zoomed_sequence",)
     FUNCTION = "make_zoom"
-    CATEGORY = "klinter"
+    CATEGORY = "No Fun"
 
     def make_zoom(self, image1: torch.Tensor, image2: torch.Tensor, image3: torch.Tensor, 
                  image4: torch.Tensor, image5: torch.Tensor, 
@@ -190,6 +190,6 @@ NODE_CLASS_MAPPINGS = {
     "LayeredInfiniteZoom": LayeredInfiniteZoom
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "LayeredInfiniteZoom": "Layered Infinite Zoom 2x - klinter"
+    "LayeredInfiniteZoom": "Layered Infinite Zoom 2x - No Fun"
 }
 __all__ = ["LayeredInfiniteZoom"]
