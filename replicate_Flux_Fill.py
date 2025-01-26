@@ -205,20 +205,36 @@ class ReplicateAPI_flux_fill_pro:
             if not output:
                 raise ValueError("No valid result from replicate.run().")
 
-            # 4) Usually a single URL or a list of URLs
-            if isinstance(output, list):
+            # Print output for debugging
+            print(f"Replicate output: {output}")
+
+            # Handle different output formats
+            image_url = None
+            if isinstance(output, dict) and 'image' in output:
+                image_url = output['image']
+            elif isinstance(output, list) and len(output) > 0:
                 image_url = output[0]
-            else:
+            elif isinstance(output, str):
                 image_url = output
+            else:
+                raise ValueError(f"Unexpected output format from replicate: {output}")
+
+            if not image_url:
+                raise ValueError("No image URL found in replicate output")
 
             # Download the image
             resp = requests.get(image_url)
             if resp.status_code != 200:
                 raise ConnectionError(f"Failed to download result image. Status code: {resp.status_code}")
 
-            pil_img = Image.open(BytesIO(resp.content)).convert("RGB")
+            try:
+                pil_img = Image.open(BytesIO(resp.content))
+                if pil_img.mode != 'RGB':
+                    pil_img = pil_img.convert('RGB')
+            except Exception as e:
+                raise ValueError(f"Failed to process downloaded image: {str(e)}")
 
-            # 5) Prepare metadata & save
+            # Save image and metadata
             number = self.get_next_number()
 
             # We'll remove any non-serializable items from input_dict
@@ -230,18 +246,17 @@ class ReplicateAPI_flux_fill_pro:
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "model": "black-forest-labs/flux-fill-pro",
                 "parameters": safe_dict,
-                "replicate_output": str(output),  # cast output to string
+                "replicate_output": str(output),
             }
 
             image_path, meta_path = self.save_image_and_metadata(pil_img, generation_info, number, ext=output_format)
             print(f"[flux-fill-pro] Single generation: saved image -> {image_path}")
             print(f"[flux-fill-pro] Single generation: saved metadata -> {meta_path}")
 
-            # Convert to ComfyUI torch tensor
+            # Convert to ComfyUI torch tensor (B, H, W, C)
             result_tensor = torch.from_numpy(np.array(pil_img).astype(np.float32) / 255.0)
-            result_tensor = result_tensor.unsqueeze(0)  # (1, H, W, C)
+            result_tensor = result_tensor.unsqueeze(0)  # Add batch dimension
 
-            # Return the single (IMAGE, STRING)
             return (result_tensor, json.dumps(generation_info, indent=2))
 
         except Exception as e:
@@ -267,15 +282,18 @@ class ReplicateAPI_flux_fill_pro:
         Convert (B, H, W, C) or (H, W, C) or (C, H, W) to a PIL image. 
         Typically, ComfyUI uses (B, H, W, C). We'll handle that.
         """
+        # If the tensor is 4D, remove batch dimension
         if len(tensor.shape) == 4:
-            # drop batch dimension
             tensor = tensor[0]
 
+        # Convert to numpy array
         arr = tensor.cpu().numpy()
-        # If shape is (C, H, W), we transpose
+        
+        # If shape is (C, H, W), transpose to (H, W, C)
         if arr.ndim == 3 and arr.shape[0] <= 4:
             arr = np.transpose(arr, (1, 2, 0))
 
+        # Scale to 0-255 range and convert to uint8
         arr = (arr * 255).clip(0, 255).astype(np.uint8)
         return Image.fromarray(arr)
 
