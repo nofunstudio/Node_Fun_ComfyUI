@@ -9,7 +9,7 @@ from io import BytesIO
 from PIL import Image
 import replicate
 
-class APIGenerateFluxFillProSingle:
+class ReplicateAPI_flux_fill_pro:
     @classmethod
     def INPUT_TYPES(cls):
         """
@@ -291,11 +291,11 @@ class APIGenerateFluxFillProSingle:
 
 # Register with ComfyUI
 NODE_CLASS_MAPPINGS = {
-    "APIGenerateFluxFillProSingle": APIGenerateFluxFillProSingle
+    "ReplicateAPI_flux_fill_pro": ReplicateAPI_flux_fill_pro
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "APIGenerateFluxFillProSingle": "Replicate Flux-Fill-Pro Single"
+    "ReplicateAPI_flux_fill_pro": "Replicate Flux-Fill-Pro"
 }
 
-__all__ = ["APIGenerateFluxFillProSingle"]
+__all__ = ["ReplicateAPI_flux_fill_pro"]
