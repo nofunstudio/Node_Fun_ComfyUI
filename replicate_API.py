@@ -164,7 +164,7 @@ class APIGenerateReplicate:
             generation_info = {
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "parameters": safe_input_data,
-                "replicate_output": output
+                "replicate_output": str(output)
             }
             # ---
 
