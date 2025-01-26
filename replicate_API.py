@@ -12,7 +12,7 @@ import threading
 import asyncio
 import io
 
-class APIGenerateReplicate:
+class ReplicateAPI_flux_1_1_pro_ultra:
     @classmethod
     def INPUT_TYPES(cls):
         """
@@ -35,6 +35,12 @@ class APIGenerateReplicate:
                 "prompt": ("STRING", {
                     "multiline": True,
                     "default": "A blackhole in space"
+                }),
+                "image_prompt_strength": ("INT", {
+                    "default": .1,
+                    "min": .1,
+                    "max": 1,
+                    "step": .01
                 }),
                 "number_of_images": ("INT", {
                     "default": 1,
@@ -182,7 +188,7 @@ class APIGenerateReplicate:
             print(f"Generation error: {str(e)}")
             raise Exception(f"Error generating image: {str(e)}")
 
-    def generate(self, api_token, model, prompt, number_of_images=1, seed=-1, timeout=300, image_prompt=None):
+    def generate(self, api_token, model, prompt, number_of_images=1, seed=-1, timeout=300, image_prompt=None, image_prompt_strength=.1):
         """
         The main entry point for ComfyUI. Gathers multiple images if requested,
         passes a (possibly optional) image_prompt, and returns combined results.
@@ -230,7 +236,8 @@ class APIGenerateReplicate:
                             input_data,
                             api_token,
                             model,
-                            image_prompt_tensor=image_prompt  # The optional image
+                            image_prompt_tensor=image_prompt, 
+                            image_prompt_strength=image_prompt_strength
                         )
                     )
                 
@@ -267,7 +274,8 @@ class APIGenerateReplicate:
                 "total_requested": number_of_images,
                 "generation_parameters": {
                     "prompt": prompt,
-                    "initial_seed": seed
+                    "initial_seed": seed,
+                    "image_prompt_strength": image_prompt_strength
                 },
                 "individual_results": infos,
                 "failed_jobs": failed_jobs if failed_jobs else None
@@ -307,11 +315,11 @@ class APIGenerateReplicate:
         self._interrupt_event.set()
 
 NODE_CLASS_MAPPINGS = {
-    "APIGenerateReplicate": APIGenerateReplicate
+    "Replicate flux 1.1 pro ultra": ReplicateAPI_flux_1_1_pro_ultra
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "APIGenerateReplicate": "Replicate API"
+    "ReplicateAPI_flux_1_1_pro_ultra": "Replicate flux 1.1 pro ultra"
 }
 
-__all__ = ["APIGenerateReplicate"]
+__all__ = ["ReplicateAPI_flux_1_1_pro_ultra"]
