@@ -27,7 +27,6 @@ class ReplicateAPI_flux_fill_pro:
         Optional fields (ComfyUI image inputs):
           - mask (IMAGE)
           - image (IMAGE)
-          - prompt_upsampling (BOOL)
         """
         return {
             "required": {
@@ -68,7 +67,6 @@ class ReplicateAPI_flux_fill_pro:
                     "max": 10,
                     "display": "Safety Tolerance"
                 }),
-                
             },
             "optional": {
                 "mask": ("IMAGE", {
@@ -76,10 +74,6 @@ class ReplicateAPI_flux_fill_pro:
                 }),
                 "image": ("IMAGE", {
                     "display": "Source Image (Optional)"
-                }),
-                "prompt_upsampling": ("BOOL", {
-                    "default": True,
-                    "display": "Prompt Upsampling?"
                 }),
             }
         }
@@ -149,7 +143,6 @@ class ReplicateAPI_flux_fill_pro:
         outpaint,
         output_format,
         safety_tolerance,
-        prompt_upsampling,
         mask=None,
         image=None
     ):
@@ -183,7 +176,7 @@ class ReplicateAPI_flux_fill_pro:
                 "outpaint": outpaint,
                 "output_format": output_format,
                 "safety_tolerance": safety_tolerance,
-                "prompt_upsampling": prompt_upsampling,
+                "prompt_upsampling": True,  # Set as default in the code instead of input
             }
 
             # 2) Convert mask/image to local files if given
