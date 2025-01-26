@@ -23,11 +23,11 @@ class ReplicateAPI_flux_fill_pro:
           - outpaint (STRING)
           - output_format (choice of "jpg" or "png")
           - safety_tolerance (INT)
-          - prompt_upsampling (BOOL)
 
         Optional fields (ComfyUI image inputs):
           - mask (IMAGE)
           - image (IMAGE)
+          - prompt_upsampling (BOOL)
         """
         return {
             "required": {
@@ -68,10 +68,7 @@ class ReplicateAPI_flux_fill_pro:
                     "max": 10,
                     "display": "Safety Tolerance"
                 }),
-                "prompt_upsampling": ("BOOL", {
-                    "default": True,
-                    "display": "Prompt Upsampling?"
-                }),
+                
             },
             "optional": {
                 "mask": ("IMAGE", {
@@ -79,6 +76,10 @@ class ReplicateAPI_flux_fill_pro:
                 }),
                 "image": ("IMAGE", {
                     "display": "Source Image (Optional)"
+                }),
+                "prompt_upsampling": ("BOOL", {
+                    "default": True,
+                    "display": "Prompt Upsampling?"
                 }),
             }
         }
