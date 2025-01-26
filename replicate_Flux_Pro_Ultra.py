@@ -36,7 +36,7 @@ class ReplicateAPI_flux_1_1_pro_ultra:
                     "multiline": True,
                     "default": "A blackhole in space"
                 }),
-                "image_prompt_strength": ("INT", {
+                "image_prompt_strength": ("FLOAT", {
                     "default": .1,
                     "min": .1,
                     "max": 1,
@@ -106,7 +106,7 @@ class ReplicateAPI_flux_1_1_pro_ultra:
 
         return filepath, metadata_filepath
 
-    async def generate_single_image_async(self, input_data, api_token, model, image_prompt_tensor=None):
+    async def generate_single_image_async(self, input_data, api_token, model, image_prompt_tensor=None, image_prompt_strength=.1):
         """
         A single async "job" that calls replicate.run() in a worker thread.
         If 'image_prompt_tensor' is provided, convert it to a local file
