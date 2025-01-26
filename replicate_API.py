@@ -10,6 +10,7 @@ from io import BytesIO
 import json
 import threading
 import asyncio
+import io
 
 class APIGenerateReplicate:
     @classmethod
@@ -153,13 +154,20 @@ class APIGenerateReplicate:
             # Convert into PIL
             img = Image.open(BytesIO(image_response.content)).convert("RGB")
 
+            # --- Remove non-serializable file object before saving metadata ---
+            safe_input_data = dict(input_data)
+            # pop() ensures we remove the open file or anything else that won't serialize
+            safe_input_data.pop("image_prompt", None)
+
             # Save the image and metadata
             number = self.get_next_number()
             generation_info = {
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "parameters": input_data,
+                "parameters": safe_input_data,
                 "replicate_output": output
             }
+            # ---
+
             image_path, metadata_path = self.save_image_and_metadata(img, generation_info, number)
             print(f"Saved image to: {image_path}")
             print(f"Saved metadata to: {metadata_path}")
@@ -307,5 +315,3 @@ NODE_DISPLAY_NAME_MAPPINGS = {
 }
 
 __all__ = ["APIGenerateReplicate"]
-
-       
