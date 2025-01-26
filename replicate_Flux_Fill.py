@@ -143,7 +143,6 @@ class ReplicateAPI_flux_fill_pro:
         outpaint,
         output_format,
         safety_tolerance,
-        prompt_upsampling,
         mask=None,
         image=None
     ):
