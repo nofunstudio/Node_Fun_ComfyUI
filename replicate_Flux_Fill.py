@@ -9,24 +9,13 @@ from io import BytesIO
 from PIL import Image
 import replicate
 
-class ReplicateAPI_flux_fill_pro:
+class APIGenerateFluxFillProSingle:
     @classmethod
     def INPUT_TYPES(cls):
         """
-        A single synchronous generation node for `black-forest-labs/flux-fill-pro`.
-        
-        Required fields:
-          - api_token (STRING)
-          - prompt (STRING)
-          - steps (INT)
-          - guidance (FLOAT)
-          - outpaint (STRING)
-          - output_format (choice of "jpg" or "png")
-          - safety_tolerance (INT)
-
-        Optional fields (ComfyUI image inputs):
-          - mask (IMAGE)
-          - image (IMAGE)
+        A single-image, synchronous node for `black-forest-labs/flux-fill-pro`.
+        The parameters come directly from the model docs, plus
+        two optional IMAGE inputs for 'mask' and 'image'.
         """
         return {
             "required": {
@@ -55,10 +44,10 @@ class ReplicateAPI_flux_fill_pro:
                 }),
                 "outpaint": ("STRING", {
                     "default": "Zoom out 2x",
-                    "display": "Outpaint Type"
+                    "display": "Outpaint"
                 }),
-                "output_format": (["jpg", "png"], {
-                    "default": "jpg",
+                "output_format": (["png", "jpg"], {
+                    "default": "png",
                     "display": "Output Format"
                 }),
                 "safety_tolerance": ("INT", {
@@ -67,8 +56,10 @@ class ReplicateAPI_flux_fill_pro:
                     "max": 10,
                     "display": "Safety Tolerance"
                 }),
+              
             },
             "optional": {
+                # Optional IMAGE inputs from ComfyUI (e.g. Load Image node)
                 "mask": ("IMAGE", {
                     "display": "Mask Image (Optional)"
                 }),
@@ -84,55 +75,64 @@ class ReplicateAPI_flux_fill_pro:
     CATEGORY = "Replicate"
 
     def __init__(self):
-        # Output directories for saving images & metadata
-        self.output_dir = "output/API/Replicate/flux-fill-pro-single"
+        # Same directory structure as your flux ultra node:
+        self.output_dir = "output/API/Replicate/flux-fill-pro"
         self.metadata_dir = os.path.join(self.output_dir, "metadata")
+
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.metadata_dir, exist_ok=True)
 
     def get_next_number(self):
         """
-        Find the next available integer filename (e.g. 001.jpg).
+        Looks at existing .png/.jpg files and picks the next integer
+        filename index (e.g. 001, 002, etc.).
         """
-        files = [f for f in os.listdir(self.output_dir) if f.endswith('.png') or f.endswith('.jpg')]
+        valid_exts = {".png", ".jpg"}
+        files = [f for f in os.listdir(self.output_dir) 
+                 if os.path.splitext(f)[1].lower() in valid_exts]
         if not files:
             return 1
 
         numbers = []
-        for f in files:
-            base, ext = os.path.splitext(f)
+        for file_name in files:
+            base, _ = os.path.splitext(file_name)
             try:
                 numbers.append(int(base))
             except ValueError:
                 pass
+        
         if numbers:
             return max(numbers) + 1
         else:
             return 1
 
-    def create_filename(self, number, ext="jpg"):
+    def create_filename(self, number):
         """
-        Format the filename like 001.jpg or 002.png, etc.
+        The flux ultra node used zero-padded filenames ending in .png
+        (e.g., '001.png'). We'll keep that exact style here.
         """
-        return f"{number:03d}.{ext}"
+        return f"{number:03d}.png"
 
-    def save_image_and_metadata(self, pil_img, generation_info, number, ext="jpg"):
+    def save_image_and_metadata(self, img, generation_info, number):
         """
-        Saves the PIL image and the metadata JSON file. Returns file paths.
+        Saves the image as .png, plus metadata as a .json.
+        Identical to the flux ultra approach.
         """
-        file_basename = self.create_filename(number, ext)
-        image_path = os.path.join(self.output_dir, file_basename)
+        filename = self.create_filename(number)
+        filepath = os.path.join(self.output_dir, filename)
 
-        # Save the image
-        pil_img.save(image_path, format=ext.upper())
+        # Save image
+        img.save(filepath, format="PNG")
 
-        # Save JSON metadata
-        meta_filename = f"{number:03d}_metadata.json"
-        meta_path = os.path.join(self.metadata_dir, meta_filename)
-        with open(meta_path, 'w', encoding='utf-8') as f:
+        # Create metadata filename (001_metadata.json)
+        metadata_filename = f"{number:03d}_metadata.json"
+        metadata_filepath = os.path.join(self.metadata_dir, metadata_filename)
+
+        # Write out metadata
+        with open(metadata_filepath, "w", encoding="utf-8") as f:
             json.dump(generation_info, f, indent=4, ensure_ascii=False)
 
-        return image_path, meta_path
+        return filepath, metadata_filepath
 
     def generate(
         self,
@@ -143,58 +143,50 @@ class ReplicateAPI_flux_fill_pro:
         outpaint,
         output_format,
         safety_tolerance,
+        prompt_upsampling,
         mask=None,
         image=None
     ):
         """
-        Synchronous single-image generation for flux-fill-pro.
-        No multi-image or seeds. Just a single replicate.run() call.
-
-        ComfyUI calls this function. We:
-
-        1) Convert 'mask' and 'image' from ComfyUI tensors to temp files (if provided).
-        2) Call replicate.run("black-forest-labs/flux-fill-pro", ...)
-        3) Download the result
-        4) Save image & metadata
-        5) Return (IMAGE, STRING)
+        Single synchronous call to replicate.run("black-forest-labs/flux-fill-pro").
+        Saves image & metadata exactly as done previously, then returns (IMAGE, STRING).
         """
-        # Validate
-        if not api_token:
-            raise ValueError("API token is required for Replicate calls.")
+        # For errors, we return an empty 1024x1024 (B=1,H=1024,W=1024,C=3), 
+        # which is what your flux ultra node used as a fallback.
+        empty_image = torch.zeros((1, 1024, 1024, 3))
 
-        # We'll return a placeholder if generation fails
-        empty_img = torch.zeros((1, 512, 512, 3))
+        # Make sure we have an API token
+        if not api_token:
+            raise ValueError("A Replicate API token is required.")
 
         try:
             # 1) Build the input dictionary
             os.environ["REPLICATE_API_TOKEN"] = api_token
-
-            input_dict = {
+            input_data = {
                 "prompt": prompt,
                 "steps": steps,
                 "guidance": guidance,
                 "outpaint": outpaint,
-                "output_format": output_format,
+                "output_format": output_format,  # "png" or "jpg"
                 "safety_tolerance": safety_tolerance,
-                "prompt_upsampling": True,  # Set as default in the code instead of input
+                "prompt_upsampling": True,
             }
 
-            # 2) Convert mask/image to local files if given
+            # 2) Convert optional mask/image to local files if present
             mask_file = None
             image_file = None
 
             if mask is not None:
-                mask_file = self.tensor_to_tempfile(mask, suffix=".png")
-                input_dict["mask"] = mask_file
-
+                mask_file = self.tensor_to_tempfile(mask)
+                input_data["mask"] = mask_file
             if image is not None:
-                image_file = self.tensor_to_tempfile(image, suffix=".png")
-                input_dict["image"] = image_file
+                image_file = self.tensor_to_tempfile(image)
+                input_data["image"] = image_file
 
-            # 3) Call replicate.run (sync)
-            output = replicate.run("black-forest-labs/flux-fill-pro", input=input_dict)
+            # 3) Call replicate.run() 
+            output = replicate.run("black-forest-labs/flux-fill-pro", input=input_data)
 
-            # Clean up temp files
+            # 4) Clean up local files
             if mask_file is not None:
                 mask_file.close()
                 os.remove(mask_file.name)
@@ -205,120 +197,105 @@ class ReplicateAPI_flux_fill_pro:
             if not output:
                 raise ValueError("No valid result from replicate.run().")
 
-            # Print output for debugging
-            print(f"Replicate output: {output}")
-
-            # Handle different output formats
-            image_url = None
-            if isinstance(output, dict) and 'image' in output:
-                image_url = output['image']
-            elif isinstance(output, list) and len(output) > 0:
+            # 5) Usually a single URL or a list
+            if isinstance(output, list):
                 image_url = output[0]
-            elif isinstance(output, str):
-                image_url = output
             else:
-                raise ValueError(f"Unexpected output format from replicate: {output}")
+                image_url = output
 
-            if not image_url:
-                raise ValueError("No image URL found in replicate output")
-
-            # Download the image
+            # 6) Download final image
             resp = requests.get(image_url)
             if resp.status_code != 200:
-                raise ConnectionError(f"Failed to download result image. Status code: {resp.status_code}")
+                raise ConnectionError(f"Failed to download image. HTTP {resp.status_code}")
 
-            try:
-                pil_img = Image.open(BytesIO(resp.content))
-                if pil_img.mode != 'RGB':
-                    pil_img = pil_img.convert('RGB')
-            except Exception as e:
-                raise ValueError(f"Failed to process downloaded image: {str(e)}")
+            pil_img = Image.open(BytesIO(resp.content))
+            if pil_img.mode != "RGB":
+                pil_img = pil_img.convert("RGB")
 
-            # Save image and metadata
+            # 7) Save the image & metadata with the same flux ultra logic
             number = self.get_next_number()
+            # We'll remove non-serializable items from input_data
+            safe_input_data = dict(input_data)
+            safe_input_data.pop("mask", None)
+            safe_input_data.pop("image", None)
 
-            # We'll remove any non-serializable items from input_dict
-            safe_dict = dict(input_dict)
-            safe_dict.pop("mask", None)
-            safe_dict.pop("image", None)
-
+            # Keep replicate output as string
             generation_info = {
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "model": "black-forest-labs/flux-fill-pro",
-                "parameters": safe_dict,
+                "parameters": safe_input_data,
                 "replicate_output": str(output),
+                "model": "black-forest-labs/flux-fill-pro"
             }
 
-            image_path, meta_path = self.save_image_and_metadata(pil_img, generation_info, number, ext=output_format)
-            print(f"[flux-fill-pro] Single generation: saved image -> {image_path}")
-            print(f"[flux-fill-pro] Single generation: saved metadata -> {meta_path}")
+            image_path, metadata_path = self.save_image_and_metadata(pil_img, generation_info, number)
+            print(f"[flux-fill-pro single] Saved image -> {image_path}")
+            print(f"[flux-fill-pro single] Saved metadata -> {metadata_path}")
 
-            # Convert to ComfyUI torch tensor (B, H, W, C)
-            result_tensor = torch.from_numpy(np.array(pil_img).astype(np.float32) / 255.0)
-            result_tensor = result_tensor.unsqueeze(0)  # Add batch dimension
+            # 8) Convert to ComfyUI's IMAGE format (1, H, W, 3)
+            img_tensor = torch.from_numpy(np.array(pil_img).astype(np.float32) / 255.0)
+            img_tensor = img_tensor.unsqueeze(0)
 
-            return (result_tensor, json.dumps(generation_info, indent=2))
+            # 9) Return the image tensor & metadata JSON string
+            return (img_tensor, json.dumps(generation_info, indent=2))
 
         except Exception as e:
+            # Return an empty image and an error message in JSON
             error_info = {
                 "error": f"Flux-fill-pro single generation failed: {str(e)}",
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
             }
-            return (empty_img, json.dumps(error_info, indent=2))
+            return (empty_image, json.dumps(error_info, indent=2))
 
-    def tensor_to_tempfile(self, tensor, suffix=".png"):
+    def tensor_to_tempfile(self, tensor):
         """
-        Convert a ComfyUI image tensor to a local file object, so we can pass it to replicate.
-        We'll return an open file in "rb" mode, and the caller is responsible for closing/deleting it.
+        Matches the flux ultra logic:
+        - Convert a ComfyUI IMAGE tensor to a PNG file 
+        - Return an open file in "rb" mode (caller must close/delete).
         """
         pil_img = self.tensor_to_pil(tensor)
-        fd, filename = tempfile.mkstemp(suffix=suffix)
+        fd, filename = tempfile.mkstemp(suffix=".png")
         os.close(fd)
-        pil_img.save(filename, format=suffix.upper().lstrip("."))
+        pil_img.save(filename, format="PNG")
         return open(filename, "rb")
 
     def tensor_to_pil(self, tensor):
         """
-        Convert (B, H, W, C) or (H, W, C) or (C, H, W) to a PIL image. 
-        Typically, ComfyUI uses (B, H, W, C). We'll handle that.
+        Identical to your flux ultra approach: handle (B, H, W, C) or (C, H, W).
         """
-        # If the tensor is 4D, remove batch dimension
         if len(tensor.shape) == 4:
-            tensor = tensor[0]
+            tensor = tensor[0]  # remove batch dimension
 
-        # Convert to numpy array
         arr = tensor.cpu().numpy()
-        
-        # If shape is (C, H, W), transpose to (H, W, C)
+        # If shape is (C, H, W), transpose it
         if arr.ndim == 3 and arr.shape[0] <= 4:
             arr = np.transpose(arr, (1, 2, 0))
 
-        # Scale to 0-255 range and convert to uint8
-        arr = (arr * 255).clip(0, 255).astype(np.uint8)
+        arr = (arr * 255).clip(0, 255).astype("uint8")
         return Image.fromarray(arr)
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
         """
-        ComfyUI-specific method to handle caching logic. 
-        Returning NaN tells ComfyUI there's no caching for this node.
+        Same as your flux ultra node: 
+        returning NaN means no caching for this node.
         """
         return float("NaN")
 
     def interrupt(self):
         """
-        For multi-step processes, we could handle an interrupt event, 
-        but here it's just a single call. 
-        We'll keep it for completeness.
+        In single-image synchronous logic, there's no partial progress to interrupt. 
+        We'll leave it here for consistency with the flux ultra node.
         """
-        print("[flux-fill-pro-single] Interrupt: not used in single-image mode.")
+        print("[flux-fill-pro single] Interrupt called (not used in single-image mode).")
 
+
+# Register with ComfyUI
 NODE_CLASS_MAPPINGS = {
-    "ReplicateAPI_flux_fill_pro": ReplicateAPI_flux_fill_pro
+    "APIGenerateFluxFillProSingle": APIGenerateFluxFillProSingle
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ReplicateAPI_flux_fill_pro": "Replicate Flux-Fill-Pro"
+    "APIGenerateFluxFillProSingle": "Replicate Flux-Fill-Pro Single"
 }
 
-__all__ = ["ReplicateAPI_flux_fill_pro"]
+__all__ = ["APIGenerateFluxFillProSingle"]
