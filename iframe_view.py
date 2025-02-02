@@ -28,9 +28,15 @@ def get_global_texture_value(unique_id, key):
 
 
 def process_texture_data(data):
+    start_time = time.time()
+    print("[process_texture_data] Started processing texture data.")
+    
     if not data:
         print("[process_texture_data] No texture data received.")
-        return torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+        result = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+        print(f"[process_texture_data] Returning default tensor with shape: {result.shape}")
+        return result
+
     try:
         print("Raw data received:")
         if isinstance(data, dict) and "data" in data:
@@ -57,17 +63,22 @@ def process_texture_data(data):
                     raise
         else:
             print("[process_texture_data] Data format not recognized, returning default.")
-            return torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+            result = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+            print(f"[process_texture_data] Returning default tensor with shape: {result.shape}")
+            return result
             
         print(f"[process_texture_data] Post reshape image stats: shape={image.shape}, min={image.min()}, max={image.max()}")
         image = image.astype(np.float32) / 255.0
         tensor = torch.from_numpy(image)[None,]
         print(f"[process_texture_data] Tensor shape: {tensor.shape}, range=[{tensor.min().item():.3f}, {tensor.max().item():.3f}]")
+        elapsed = time.time() - start_time
+        print(f"[process_texture_data] Completed processing in {elapsed:.4f} seconds.")
         return tensor
     except Exception as e:
         print(f"[process_texture_data] Error processing texture data: {e}")
         traceback.print_exc()
-        return torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+        result = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+        return result
 
 class IframeView:
     @classmethod
@@ -97,6 +108,8 @@ class IframeView:
     CATEGORY = "lth"
 
     async def _process_iframe_async(self, url, width, height, scene_state, unique_id, color=None, canny=None, depth=None, normal=None):
+        start_time = time.time()
+        print("[process_iframe] Starting asynchronous processing at", start_time)
         try:
             print("\n[process_iframe] Called with inputs:")
             print("  url:", url)
@@ -126,7 +139,9 @@ class IframeView:
             canny_tensor = process_texture_data(canny)
             depth_tensor = process_texture_data(depth)
             normal_tensor = process_texture_data(normal)
-
+            
+            elapsed = time.time() - start_time
+            print(f"[process_iframe] Asynchronous processing completed in {elapsed:.4f} seconds.")
             return (color_tensor, canny_tensor, depth_tensor, normal_tensor)
         except Exception as e:
             print(f"[process_iframe] Error: {e}")

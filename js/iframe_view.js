@@ -7,6 +7,8 @@ window.TEXTURE_STORE = window.TEXTURE_STORE || {};
 
 // Function to create the iframe widget
 async function widgetIframe(node, nodeData, inputData, app) {
+	console.log("[widgetIframe] Initializing iframe widget for node:", node);
+
 	// Create iframe wrapper with some styling
 	const iframeWrapper = $el("div.iframeWrapper", {
 		style: {
@@ -48,10 +50,10 @@ async function widgetIframe(node, nodeData, inputData, app) {
 		if (event.source !== iframe.contentWindow) return;
 
 		console.log("[messageHandler] Received message:", event.data);
-
 		const { type, data } = event.data;
 		switch (type) {
 			case "IFRAME_READY":
+				console.log("[messageHandler] IFRAME_READY received");
 				sendParamsToIframe();
 				break;
 			case "TEXTURE_OUTPUT":
@@ -64,6 +66,10 @@ async function widgetIframe(node, nodeData, inputData, app) {
 			case "SCENE_STATE_UPDATED":
 				if (data.state) {
 					stateWidget.value = JSON.stringify(data.state, null, 2);
+					console.log(
+						"[messageHandler] Updated scene state:",
+						stateWidget.value
+					);
 				}
 				break;
 			default:
@@ -72,6 +78,7 @@ async function widgetIframe(node, nodeData, inputData, app) {
 	}
 
 	// Attach the message handler
+	console.log("[widgetIframe] Attaching message event listener for iframe.");
 	window.addEventListener("message", messageHandler, false);
 
 	// Function to send parameters (width, height, scene state) to the iframe
@@ -92,6 +99,12 @@ async function widgetIframe(node, nodeData, inputData, app) {
 			},
 		};
 
+		console.log(
+			"[sendParamsToIframe] Sending params at",
+			Date.now(),
+			":",
+			params
+		);
 		if (iframe.contentWindow) {
 			// If you know the target origin, replace '*' with that string
 			iframe.contentWindow.postMessage(params, "*");
@@ -100,6 +113,14 @@ async function widgetIframe(node, nodeData, inputData, app) {
 
 	// Function to handle texture output coming from the iframe
 	async function handleTextureOutput(data) {
+		const startTime = performance.now();
+		console.log(
+			"[handleTextureOutput] Processing texture output for node:",
+			node.unique_id,
+			"at",
+			startTime
+		);
+
 		// Make sure the node has a valid unique_id
 		if (!node.unique_id) {
 			console.warn(
@@ -122,7 +143,7 @@ async function widgetIframe(node, nodeData, inputData, app) {
 			}
 		});
 		console.log(
-			"[handleTextureOutput] Final global texture store for unique_id",
+			"[handleTextureOutput] Global texture store for unique_id",
 			node.unique_id,
 			window.TEXTURE_STORE[node.unique_id]
 		);
@@ -132,21 +153,24 @@ async function widgetIframe(node, nodeData, inputData, app) {
 		setTimeout(() => {
 			if (node.unique_id && window.TEXTURE_STORE[node.unique_id]) {
 				// You can conditionally delete or nullify large arrays after processing.
-				//delete window.TEXTURE_STORE[node.unique_id];
+				delete window.TEXTURE_STORE[node.unique_id];
 			}
-			const topApp =
-				(window.top && window.top !== window && window.top.app) ||
-				(window.parent && window.parent !== window && window.parent.app) ||
-				app;
 
-			if (topApp && typeof topApp.queuePrompt === "function") {
-				topApp.queuePrompt();
+			if (app) {
+				app.queuePrompt();
 			} else {
 				console.error(
 					"queuePrompt is not available in the current app context."
 				);
 			}
 		}, 50);
+
+		const elapsedTime = performance.now() - startTime;
+		console.log(
+			"[handleTextureOutput] Processing completed in",
+			elapsedTime.toFixed(2),
+			"ms"
+		);
 	}
 
 	// Create the DOM widget for this node and register cleanup
@@ -169,6 +193,7 @@ async function widgetIframe(node, nodeData, inputData, app) {
 
 	// Attach a reference to the iframe on the widget so we can access it later
 	widget.iframe = iframe;
+	console.log("[widgetIframe] Widget created and registered.");
 
 	// Handle resizing: update both node size and iframe dimensions, then re-send params
 	node.onResize = function () {
@@ -177,11 +202,13 @@ async function widgetIframe(node, nodeData, inputData, app) {
 		node.size = [width, Math.max(height + 40, 140)];
 		iframe.style.width = width + "px";
 		iframe.style.height = height - 40 + "px";
+		console.log("[onResize] Node resized to new dimensions:", width, height);
 		sendParamsToIframe();
 	};
 
 	// When the URL widget changes, update the iframe's src
 	urlWidget.callback = function () {
+		console.log("[URL Widget] Updating iframe src to:", this.value);
 		iframe.src = this.value;
 	};
 
@@ -195,6 +222,12 @@ async function widgetIframe(node, nodeData, inputData, app) {
 
 	// Override the default setHiddenWidgetValue to also update our global TEXTURE_STORE.
 	node.setHiddenWidgetValue = function (name, value) {
+		console.log(
+			"[setHiddenWidgetValue] Setting texture data for",
+			name,
+			"at",
+			Date.now()
+		);
 		let widgetEntry = this.widgets.find((w) => w.name === name);
 		if (widgetEntry) {
 			widgetEntry.value = value;
@@ -222,6 +255,12 @@ async function widgetIframe(node, nodeData, inputData, app) {
 
 	// When creating the widget
 	node.cleanup = () => {
+		console.log(
+			"[cleanup] Cleanup triggered for node:",
+			node.unique_id,
+			"at",
+			Date.now()
+		);
 		window.removeEventListener("message", messageHandler, false);
 		if (node.unique_id && window.TEXTURE_STORE[node.unique_id]) {
 			delete window.TEXTURE_STORE[node.unique_id];
@@ -264,6 +303,7 @@ app.registerExtension({
 							const domWidget = this.widgets.find((w) => w.name === "iframe");
 							if (domWidget && domWidget.iframe) {
 								const url = this.widgets.find((w) => w.name === "url").value;
+								console.log("[Extra Menu] Refreshing iframe with url:", url);
 								domWidget.iframe.src = url;
 							}
 						},
@@ -273,6 +313,7 @@ app.registerExtension({
 						callback: () => {
 							const domWidget = this.widgets.find((w) => w.name === "iframe");
 							if (domWidget?.iframe?.contentWindow) {
+								console.log("[Extra Menu] Triggering texture capture.");
 								domWidget.iframe.contentWindow.postMessage(
 									{ type: "CAPTURE_TEXTURES" },
 									"*"
