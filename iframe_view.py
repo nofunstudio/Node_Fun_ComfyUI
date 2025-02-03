@@ -137,22 +137,13 @@ class IframeView:
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
-                "color": "TEXTURE",
-                "canny": "TEXTURE",
-                "depth": "TEXTURE",
-                "normal": "TEXTURE",
                 "animationFrames": "TEXTURE_SEQUENCE",
             },
         }
 
-    RETURN_TYPES = (
-        "IMAGE", "IMAGE", "IMAGE", "IMAGE",    # base outputs
-        "IMAGE", "IMAGE", "IMAGE", "IMAGE",    # animation outputs (one per channel)
-    )
-    RETURN_NAMES = (
-        "color", "canny", "depth", "normal",
-        "animation_color", "animation_canny", "animation_depth", "animation_normal",
-    )
+    # Only return animation textures now.
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "IMAGE")
+    RETURN_NAMES = ("animation_color", "animation_canny", "animation_depth", "animation_normal")
     FUNCTION = "process_iframe"
     CATEGORY = "lth"
 
@@ -164,32 +155,19 @@ class IframeView:
         scene_state,
         frame_count,
         unique_id,
-        color=None,
-        canny=None,
-        depth=None,
-        normal=None,
         animationFrames=None,
     ):
         start_time = time.time()
         print("[process_iframe] Starting asynchronous processing at", start_time)
-        print("frame_count:", frame_count)
-        
         unique_id = str(unique_id)
 
-        # Process base textures first.
-        color_tensor = process_texture_data(color)
-        canny_tensor = process_texture_data(canny)
-        depth_tensor = process_texture_data(depth)
-        normal_tensor = process_texture_data(normal)
-
-        # Use provided hidden animation frames if available; otherwise, use fallback.
         if animationFrames is not None and len(animationFrames) >= frame_count:
             print("[process_iframe] Using provided animationFrames from hidden data.")
         else:
             print("[process_iframe] Animation frames not provided or incomplete; using fallback.")
             animationFrames = await wait_for_capture_completion(unique_id, frame_count)
 
-        # Process each frame's texture into a tensor.
+        # Process each frame's texture into a tensor for animation outputs.
         color_frames = [
             process_texture_data(frame["textures"]["color"])
             for frame in animationFrames
@@ -211,22 +189,17 @@ class IframeView:
             if "textures" in frame and "normal" in frame["textures"]
         ]
 
-        # Convert the processed frames into batched tensors.
         animation_color   = torch.stack(color_frames, dim=0)  if color_frames else None
         animation_canny   = torch.stack(canny_frames, dim=0)  if canny_frames else None
         animation_depth   = torch.stack(depth_frames, dim=0)  if depth_frames else None
         animation_normal  = torch.stack(normal_frames, dim=0) if normal_frames else None
 
-        # Clear the local reference to the heavy animationFrames data.
-        # This lets garbage-collection release the base64 strings from memory.
+        # Clear the heavy animationFrames data.
         animationFrames = None
 
         elapsed = time.time() - start_time
         print(f"[process_iframe] Asynchronous processing completed in {elapsed:.4f} seconds.")
-        return (
-            color_tensor, canny_tensor, depth_tensor, normal_tensor,
-            animation_color, animation_canny, animation_depth, animation_normal,
-        )
+        return (animation_color, animation_canny, animation_depth, animation_normal)
 
     def process_iframe(
         self,
@@ -236,10 +209,6 @@ class IframeView:
         scene_state,
         frame_count,
         unique_id,
-        color=None,
-        canny=None,
-        depth=None,
-        normal=None,
         animationFrames=None,
     ):
         return asyncio.run(
@@ -250,10 +219,6 @@ class IframeView:
                 scene_state,
                 frame_count,
                 unique_id,
-                color,
-                canny,
-                depth,
-                normal,
                 animationFrames,
             )
         )

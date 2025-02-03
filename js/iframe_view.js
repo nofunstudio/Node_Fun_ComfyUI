@@ -130,16 +130,6 @@ async function widgetIframe(node, nodeData, inputData, app) {
 		}
 	}
 
-	window.addEventListener("message", (event) => {
-		if (event.data && event.data.type === "TEXTURE_OUTPUT") {
-			console.log(
-				"[iframe_view] Received TEXTURE_OUTPUT message:",
-				event.data.data
-			);
-			handleTextureOutput(event.data.data);
-		}
-	});
-
 	// Updated handleTextureOutput: Capture frames until target is reached, then aggregate them.
 	function handleTextureOutput(data) {
 		if (node.isCaptureComplete) return;
@@ -246,10 +236,11 @@ async function widgetIframe(node, nodeData, inputData, app) {
 				sendParamsToIframe();
 			};
 
-	// Override the default setHiddenWidgetValue to also update our global TEXTURE_STORE.
+	// Modified setHiddenWidgetValue to only handle "unique_id" and "animationFrames"
 	node.setHiddenWidgetValue = function (name, value) {
+		if (name !== "unique_id" && name !== "animationFrames") return;
 		console.log(
-			"[setHiddenWidgetValue] Setting texture data for",
+			"[setHiddenWidgetValue] Setting hidden widget for",
 			name,
 			"at",
 			Date.now()
@@ -259,7 +250,6 @@ async function widgetIframe(node, nodeData, inputData, app) {
 			widgetEntry.value = value;
 			console.log(`[setHiddenWidgetValue] Updated widget '${name}' to:`, value);
 		} else {
-			// Create the widget if it does not exist.
 			widgetEntry = { name, value, isHidden: true };
 			this.widgets.push(widgetEntry);
 			console.log(
@@ -294,25 +284,13 @@ async function widgetIframe(node, nodeData, inputData, app) {
 		console.log("[cleanup] Cleaned up resources for node:", node.unique_id);
 	};
 
-	// Updated onSerialize: Strip out the heavy "data" field to avoid localStorage quota problems.
+	// Updated onSerialize: Only serialize the animationFrames hidden widget.
 	node.onSerialize = (nodeData) => {
-		// Always ensure a hidden data object exists
 		nodeData.hidden = nodeData.hidden || {};
-
-		// Serialize the basic texture keys (keep any properties like base64 data)
-		const textureKeys = ["color", "canny", "depth", "normal"];
-		textureKeys.forEach((key) => {
-			const widgetEntry = node.widgets.find((w) => w.name === key);
-			if (widgetEntry && widgetEntry.value) {
-				nodeData.hidden[key] = widgetEntry.value;
-			}
-		});
-
-		// Serialize the animation frames in full.
 		const animWidget = node.widgets.find((w) => w.name === "animationFrames");
 		nodeData.hidden["animationFrames"] =
 			animWidget && animWidget.value ? animWidget.value : [];
-		console.log("[onSerialize] Serialized animation frames:", nodeData.hidden);
+		console.log("[onSerialize] Serialized hidden data:", nodeData.hidden);
 	};
 
 	// Update triggerCapture to reset the frame buffer state and cache the dynamic frame count.
