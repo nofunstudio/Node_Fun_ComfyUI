@@ -28,33 +28,56 @@ def get_global_texture_value(unique_id, key):
 
 
 def process_texture_data(data):
+    """
+    Process incoming texture data from the iframe.
+    We expect data to be a dict containing a base64-encoded image string (under the "base64" key)
+    along with width, height, and other metadata.
+    """
     start_time = time.time()
-    print("[process_texture_data] Started processing texture data.")
+    print("[process_texture_data] Started processing texture data. Data type:", type(data))
     
-    if not data:
-        print("[process_texture_data] No texture data received.")
-        result = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+    if data is None:
+        print("[process_texture_data] No texture data received (data is None).")
+        result = torch.zeros((64, 64, 3), dtype=torch.float32)
         print(f"[process_texture_data] Returning default tensor with shape: {result.shape}")
         return result
 
+    # Log the structure of the data if it's a dict.
+    if isinstance(data, dict):
+        print("[process_texture_data] Texture data keys:", list(data.keys()))
+        if "base64" in data:
+            base64_string = data.get("base64")
+            print("[process_texture_data] Found 'base64' key with string length:", len(base64_string))
+        elif "data" in data:
+            base64_string = data.get("data")
+            print("[process_texture_data] Found 'data' key with string length:", len(base64_string) if isinstance(base64_string, str) else "non-string")
+    else:
+        print("[process_texture_data] Unexpected data format. Data:", data)
+        
     try:
-        print("Raw data received:")
-        if isinstance(data, dict) and "data" in data:
-            if isinstance(data["data"], str):
-                print("[process_texture_data] Received base64 encoded texture data.")
-                b64data = data["data"]
+        # Process if the data dict has either "base64" or "data"
+        if isinstance(data, dict) and ("data" in data or "base64" in data):
+            b64data = data.get("base64", data.get("data"))
+            if isinstance(b64data, str):
+                print("[process_texture_data] b64data is string. Checking for header...")
                 if b64data.startswith("data:"):
                     print("[process_texture_data] Stripping data URL header from base64 string.")
-                    b64data = b64data.split(",")[-1]
+                    parts = b64data.split(",")
+                    print("[process_texture_data] Header part:", parts[0])
+                    b64data = parts[-1]
+                print("[process_texture_data] Final base64 string length:", len(b64data))
                 image_bytes = base64.b64decode(b64data)
+                print("[process_texture_data] Decoded base64, received", len(image_bytes), "bytes.")
                 pil_image = Image.open(BytesIO(image_bytes)).convert("RGB")
+                print("[process_texture_data] PIL image mode:", pil_image.mode)
                 image = np.array(pil_image)
                 print(f"[process_texture_data] PIL image shape: {image.shape}")
             else:
-                print("[process_texture_data] Received raw numeric texture data.")
+                print("[process_texture_data] b64data is not a string. Type:", type(b64data))
                 width = data.get("width", 64)
                 height = data.get("height", 64)
-                pixel_array = np.array(data["data"], dtype=np.uint8)
+                pixel_array = np.array(data.get("data"), dtype=np.uint8)
+                print("[process_texture_data] Raw pixel_array shape from 'data':", pixel_array.shape)
                 try:
                     image = pixel_array.reshape(height, width, 3)
                     print(f"[process_texture_data] Reshaped image to: {image.shape}")
@@ -62,23 +85,38 @@ def process_texture_data(data):
                     print(f"[process_texture_data] Error reshaping array: {reshape_err}")
                     raise
         else:
-            print("[process_texture_data] Data format not recognized, returning default.")
-            result = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+            print("[process_texture_data] Data format not recognized, returning default tensor.")
+            result = torch.zeros((64, 64, 3), dtype=torch.float32)
             print(f"[process_texture_data] Returning default tensor with shape: {result.shape}")
             return result
             
-        print(f"[process_texture_data] Post reshape image stats: shape={image.shape}, min={image.min()}, max={image.max()}")
+        print(f"[process_texture_data] Post-conversion image stats: shape={image.shape}, min={image.min()}, max={image.max()}")
         image = image.astype(np.float32) / 255.0
-        tensor = torch.from_numpy(image)[None,]
-        print(f"[process_texture_data] Tensor shape: {tensor.shape}, range=[{tensor.min().item():.3f}, {tensor.max().item():.3f}]")
+        
+        tensor = torch.from_numpy(image)
+        print(f"[process_texture_data] Final tensor shape: {tensor.shape}, range=[{tensor.min().item():.3f}, {tensor.max().item():.3f}]")
         elapsed = time.time() - start_time
         print(f"[process_texture_data] Completed processing in {elapsed:.4f} seconds.")
         return tensor
     except Exception as e:
         print(f"[process_texture_data] Error processing texture data: {e}")
         traceback.print_exc()
-        result = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+        result = torch.zeros((64, 64, 3), dtype=torch.float32)
         return result
+
+
+async def wait_for_capture_completion(unique_id, target_frame_count, timeout=20.0, interval=0.5):
+    waited = 0.0
+    while waited < timeout:
+        frames = get_global_texture_value(unique_id, "animationFrames")
+        frame_count = len(frames) if frames is not None else 0
+        print(f"[wait_for_capture_completion] {waited:.2f}s elapsed: Found {frame_count} frames for unique_id '{unique_id}'")
+        if frames and frame_count >= target_frame_count:
+            return frames
+        await asyncio.sleep(interval)
+        waited += interval
+    print("[wait_for_capture_completion] Timeout reached, returning empty list.")
+    return []
 
 class IframeView:
     @classmethod
@@ -90,71 +128,133 @@ class IframeView:
                 "height": ("INT", {"default": 512, "min": 64, "max": 2048}),
                 "scene_state": (
                     "STRING",
-                    {"multiline": True, "default": "{\"camera\": {\"position\": [0,0,5]}, \"animation\": false}"}
+                    {
+                        "multiline": True,
+                        "default": "{\"camera\": {\"position\": [0,0,5]}, \"animation\": false}",
+                    },
                 ),
+                "frame_count": ("INT", {"default": 4, "min": 1, "max": 60}),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
                 "color": "TEXTURE",
                 "canny": "TEXTURE",
                 "depth": "TEXTURE",
-                "normal": "TEXTURE"
-            }
+                "normal": "TEXTURE",
+                "animationFrames": "TEXTURE_SEQUENCE",
+            },
         }
 
-    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "IMAGE")
-    RETURN_NAMES = ("color", "canny", "depth", "normal")
+    RETURN_TYPES = (
+        "IMAGE", "IMAGE", "IMAGE", "IMAGE",    # base outputs
+        "IMAGE", "IMAGE", "IMAGE", "IMAGE",    # animation outputs (one per channel)
+    )
+    RETURN_NAMES = (
+        "color", "canny", "depth", "normal",
+        "animation_color", "animation_canny", "animation_depth", "animation_normal",
+    )
     FUNCTION = "process_iframe"
     CATEGORY = "lth"
 
-    async def _process_iframe_async(self, url, width, height, scene_state, unique_id, color=None, canny=None, depth=None, normal=None):
+    async def _process_iframe_async(
+        self,
+        url,
+        width,
+        height,
+        scene_state,
+        frame_count,
+        unique_id,
+        color=None,
+        canny=None,
+        depth=None,
+        normal=None,
+        animationFrames=None,
+    ):
         start_time = time.time()
         print("[process_iframe] Starting asynchronous processing at", start_time)
-        try:
-            print("\n[process_iframe] Called with inputs:")
-            print("  url:", url)
-            print("  width:", width, "height:", height)
-            print("  scene_state:", scene_state)
-            print("  unique_id:", unique_id)
+        print("frame_count:", frame_count)
+        
+        unique_id = str(unique_id)
 
-            # Since the iframe is always sending fully processed texture data,
-            # there is no need to trigger an intermediate save check.
-            # Directly retrieve the texture data.
-            if color is None:
-                color = get_global_texture_value(unique_id, "color")
-            if canny is None:
-                canny = get_global_texture_value(unique_id, "canny")
-            if depth is None:
-                depth = get_global_texture_value(unique_id, "depth")
-            if normal is None:
-                normal = get_global_texture_value(unique_id, "normal")
+        # Process base textures first.
+        color_tensor = process_texture_data(color)
+        canny_tensor = process_texture_data(canny)
+        depth_tensor = process_texture_data(depth)
+        normal_tensor = process_texture_data(normal)
 
-            try:
-                state_data = json.loads(scene_state)
-            except json.JSONDecodeError as e:
-                print(f"[process_iframe] Invalid scene state JSON: {e}")
-                state_data = {}
+        # Use provided hidden animation frames if available; otherwise, use fallback.
+        if animationFrames is not None and len(animationFrames) >= frame_count:
+            print("[process_iframe] Using provided animationFrames from hidden data.")
+        else:
+            print("[process_iframe] Animation frames not provided or incomplete; using fallback.")
+            animationFrames = await wait_for_capture_completion(unique_id, frame_count)
 
-            color_tensor = process_texture_data(color)
-            canny_tensor = process_texture_data(canny)
-            depth_tensor = process_texture_data(depth)
-            normal_tensor = process_texture_data(normal)
-            
-            elapsed = time.time() - start_time
-            print(f"[process_iframe] Asynchronous processing completed in {elapsed:.4f} seconds.")
-            return (color_tensor, canny_tensor, depth_tensor, normal_tensor)
-        except Exception as e:
-            print(f"[process_iframe] Error: {e}")
-            empty = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
-            return (empty, empty, empty, empty)
+        # Process each frame's texture into a tensor.
+        color_frames = [
+            process_texture_data(frame["textures"]["color"])
+            for frame in animationFrames
+            if "textures" in frame and "color" in frame["textures"]
+        ]
+        canny_frames = [
+            process_texture_data(frame["textures"]["canny"])
+            for frame in animationFrames
+            if "textures" in frame and "canny" in frame["textures"]
+        ]
+        depth_frames = [
+            process_texture_data(frame["textures"]["depth"])
+            for frame in animationFrames
+            if "textures" in frame and "depth" in frame["textures"]
+        ]
+        normal_frames = [
+            process_texture_data(frame["textures"]["normal"])
+            for frame in animationFrames
+            if "textures" in frame and "normal" in frame["textures"]
+        ]
 
-    def process_iframe(self, url, width, height, scene_state, unique_id, color=None, canny=None, depth=None, normal=None):
-        """
-        Synchronous wrapper for _process_iframe_async.
-        """
+        # Convert the processed frames into batched tensors.
+        animation_color   = torch.stack(color_frames, dim=0)  if color_frames else None
+        animation_canny   = torch.stack(canny_frames, dim=0)  if canny_frames else None
+        animation_depth   = torch.stack(depth_frames, dim=0)  if depth_frames else None
+        animation_normal  = torch.stack(normal_frames, dim=0) if normal_frames else None
+
+        # Clear the local reference to the heavy animationFrames data.
+        # This lets garbage-collection release the base64 strings from memory.
+        animationFrames = None
+
+        elapsed = time.time() - start_time
+        print(f"[process_iframe] Asynchronous processing completed in {elapsed:.4f} seconds.")
+        return (
+            color_tensor, canny_tensor, depth_tensor, normal_tensor,
+            animation_color, animation_canny, animation_depth, animation_normal,
+        )
+
+    def process_iframe(
+        self,
+        url,
+        width,
+        height,
+        scene_state,
+        frame_count,
+        unique_id,
+        color=None,
+        canny=None,
+        depth=None,
+        normal=None,
+        animationFrames=None,
+    ):
         return asyncio.run(
             self._process_iframe_async(
-                url, width, height, scene_state, unique_id, color, canny, depth, normal
+                url,
+                width,
+                height,
+                scene_state,
+                frame_count,
+                unique_id,
+                color,
+                canny,
+                depth,
+                normal,
+                animationFrames,
             )
         )
 
