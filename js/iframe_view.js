@@ -7,6 +7,12 @@ window.TEXTURE_STORE = window.TEXTURE_STORE || {};
 
 // Function to create the iframe widget
 async function widgetIframe(node, nodeData, inputData, app) {
+	// Locate our parameter widgets
+	const urlWidget = node.widgets.find((w) => w.name === "url");
+	const widthWidget = node.widgets.find((w) => w.name === "width");
+	const heightWidget = node.widgets.find((w) => w.name === "height");
+	const stateWidget = node.widgets.find((w) => w.name === "scene_state");
+
 	console.log("[widgetIframe] Initializing iframe widget for node:", node);
 	node.isCaptureComplete = false;
 	// Create iframe wrapper with some styling
@@ -23,8 +29,8 @@ async function widgetIframe(node, nodeData, inputData, app) {
 	// Create the iframe element
 	const iframe = $el("iframe", {
 		style: {
-			width: "100%",
-			height: "100%",
+			width: widthWidget.value + "px",
+			height: heightWidget.value + "px",
 			border: "none",
 		},
 		sandbox: "allow-scripts allow-same-origin allow-forms",
@@ -32,12 +38,6 @@ async function widgetIframe(node, nodeData, inputData, app) {
 	});
 
 	iframeWrapper.appendChild(iframe);
-
-	// Locate our parameter widgets
-	const urlWidget = node.widgets.find((w) => w.name === "url");
-	const widthWidget = node.widgets.find((w) => w.name === "width");
-	const heightWidget = node.widgets.find((w) => w.name === "height");
-	const stateWidget = node.widgets.find((w) => w.name === "scene_state");
 
 	// Set initial URL if provided
 	if (urlWidget.value) {

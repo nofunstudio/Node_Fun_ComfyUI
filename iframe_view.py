@@ -129,11 +129,10 @@ class IframeView:
                 "scene_state": (
                     "STRING",
                     {
-                        "multiline": True,
                         "default": "{\"camera\": {\"position\": [0,0,5]}, \"animation\": false}",
                     },
                 ),
-                "frame_count": ("INT", {"default": 4, "min": 1, "max": 60}),
+                "frame_count": ("INT", {"default": 4, "min": 1, "max": 400}),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
