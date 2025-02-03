@@ -105,7 +105,7 @@ def process_texture_data(data):
         return result
 
 
-async def wait_for_capture_completion(unique_id, target_frame_count, timeout=20.0, interval=0.5):
+async def wait_for_capture_completion(unique_id, target_frame_count, timeout=1.0, interval=0.1):
     waited = 0.0
     while waited < timeout:
         frames = get_global_texture_value(unique_id, "animationFrames")

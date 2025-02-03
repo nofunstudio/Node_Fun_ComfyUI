@@ -55,6 +55,7 @@ async function widgetIframe(node, nodeData, inputData, app) {
 				// Reset frame buffer when the frame_count changes.
 				node.frameBuffer = [];
 				node.isCaptureComplete = false;
+				console.log("isCaptureComplete callback:", node.isCaptureComplete);
 			},
 		};
 		node.widgets.push(frameCountWidget);
@@ -132,6 +133,10 @@ async function widgetIframe(node, nodeData, inputData, app) {
 
 	// Updated handleTextureOutput: Capture frames until target is reached, then aggregate them.
 	function handleTextureOutput(data) {
+		console.log(
+			"isCaptureComplete handleTextureOutput:",
+			node.isCaptureComplete
+		);
 		if (node.isCaptureComplete) return;
 		// Validate that we received all expected textures.
 		if (!data || !data.color || !data.depth || !data.normal || !data.canny) {
@@ -177,10 +182,22 @@ async function widgetIframe(node, nodeData, inputData, app) {
 				);
 			}
 		} else {
-			// When all frames are captured, update the hidden widget and mark the capture complete.
+			// Update the hidden widget with the animation frames.
 			node.setHiddenWidgetValue("animationFrames", node.frameBuffer);
+
+			// Force a flush of hidden widget values by invoking onSerialize immediately.
+			if (typeof node.onSerialize === "function") {
+				const serializedHiddenData = {};
+				node.onSerialize(serializedHiddenData);
+				console.log(
+					"[handleTextureOutput] Forced reserialization:",
+					serializedHiddenData
+				);
+			}
+
 			iframe.contentWindow.postMessage({ type: "STOP_CAPTURE" }, "*");
 			node.isCaptureComplete = true;
+			console.log("isCaptureComplete StopCapture:", node.isCaptureComplete);
 			console.log(
 				"[handleTextureOutput] Completed capturing",
 				targetFrameCount,
@@ -293,14 +310,24 @@ async function widgetIframe(node, nodeData, inputData, app) {
 		console.log("[onSerialize] Serialized hidden data:", nodeData.hidden);
 	};
 
-	// Update triggerCapture to reset the frame buffer state and cache the dynamic frame count.
+	// Updated triggerCapture function with guard logic to avoid recapturing frames
 	node.triggerCapture = function () {
-		// Reset previous capture state.
+		// Check if frames are already captured. If so, do not trigger a new capture.
+		if (
+			node.isCaptureComplete &&
+			node.frameBuffer &&
+			node.frameBuffer.length > 0
+		) {
+			console.log(
+				"[triggerCapture] Frames already captured; skipping recapture."
+			);
+			return;
+		}
+
+		// Reset state for a new capture.
 		node.frameBuffer = [];
 		node.isCaptureComplete = false;
-		// Clear out previous animation frames from the hidden widget/global store.
 		node.setHiddenWidgetValue("animationFrames", []);
-		// Cache the target frame count from the widget (defaulting to 4 if not provided).
 		node.targetFrameCount =
 			parseInt(node.widgets.find((w) => w.name === "frame_count")?.value, 10) ||
 			4;
@@ -308,9 +335,41 @@ async function widgetIframe(node, nodeData, inputData, app) {
 			"[triggerCapture] Reset capture state. Target frame count:",
 			node.targetFrameCount
 		);
+
 		if (iframe.contentWindow)
 			iframe.contentWindow.postMessage({ type: "CAPTURE_TEXTURES" }, "*");
 		console.log(" starting capture...");
+
+		// Start polling for capture completion.
+		const checkCaptureInterval = setInterval(() => {
+			if (node.isCaptureComplete) {
+				clearInterval(checkCaptureInterval);
+				// Force a re‑serialization of hidden widget values.
+				if (typeof node.onSerialize === "function") {
+					const serializedHiddenData = {};
+					node.onSerialize(serializedHiddenData);
+					console.log(
+						"[triggerCapture] Forced reserialization:",
+						serializedHiddenData
+					);
+				}
+				console.log(
+					"[triggerCapture] Capture complete, queuing prompt using updated hidden data."
+				);
+				app.queuePrompt();
+
+				// After queuing the prompt, schedule clearing the captured frames
+				// so that the next capture cycle can run fresh.
+				setTimeout(() => {
+					console.log(
+						"[triggerCapture] Clearing capture frames for new cycle."
+					);
+					node.frameBuffer = [];
+					node.isCaptureComplete = false;
+					node.setHiddenWidgetValue("animationFrames", []);
+				}, 50);
+			}
+		}, 500);
 	};
 
 	return widget;
@@ -380,11 +439,39 @@ app.registerExtension({
 					: undefined;
 			};
 
-			// Here is the key: hook into the node processing
-			nodeType.prototype.onProcess = function () {
-				console.log("[onProcess] Node is now processing. Triggering capture.");
-				// Call the capture method only when the node is actually queued.
-				if (this.triggerCapture) this.triggerCapture();
+			// Updated onProcess method that waits for capture to finish if needed.
+			nodeType.prototype.onProcess = async function () {
+				console.log("[onProcess] Node processing triggered.");
+				// Only trigger a capture if frames are not already captured.
+				if (
+					!this.isCaptureComplete &&
+					typeof this.triggerCapture === "function"
+				) {
+					console.log("[onProcess] Capture not complete; triggering capture.");
+					this.triggerCapture();
+
+					// Optionally, wait until capture completes (up to a maximum wait time).
+					const maxWaitTime = 10000; // e.g. 10 seconds.
+					const pollInterval = 100;
+					let waited = 0;
+					while (!this.isCaptureComplete && waited < maxWaitTime) {
+						await new Promise((resolve) => setTimeout(resolve, pollInterval));
+						waited += pollInterval;
+					}
+					if (!this.isCaptureComplete) {
+						console.warn(
+							"[onProcess] Capture did not complete within wait time; proceeding with current data."
+						);
+					} else {
+						console.log(
+							"[onProcess] Capture complete; proceeding with updated hidden data."
+						);
+					}
+				} else {
+					console.log(
+						"[onProcess] Capture already complete; using existing data."
+					);
+				}
 			};
 		}
 	},
