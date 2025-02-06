@@ -9,10 +9,10 @@ class DynamicQueueCounter:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                # Widget shows start as 0, but we subtract 1 internally.
+                # Widget shows start as 0
                 "start": ("FLOAT", {"default": 0.0}),
-                # Widget shows stop as 3, but we subtract 1.5 internally.
-                "stop": ("FLOAT", {"default": 3.0}),
+                # Widget shows stop as 8
+                "stop": ("FLOAT", {"default": 8.0}),
                 "step": ("FLOAT", {"default": 1.0}),
             }
         }
@@ -28,40 +28,60 @@ class DynamicQueueCounter:
         return float("NaN")
 
     def node(self, start, stop, step):
-        # Adjust widget values internally.
-        internal_start = float(start) - 1.0
-        internal_stop = float(stop) - 1.5
+        display_offset = 1.0
+        # Adjust widget values for internal calculation.
+        # (The displayed value is normally calculated as internal_value + display_offset.)
+        internal_start = float(start) - display_offset
+        internal_stop = float(stop) - display_offset
 
-        # Initialize the counter on first run.
         if not hasattr(self, "counter"):
             self.counter = internal_start
-            print("SimpleNumberCounter: Initialized counter =", self.counter)
+            print("DynamicQueueCounter: Initialized counter =", self.counter)
 
-        current = self.counter
-
-        # If no step, do not change the counter.
         if step == 0:
-            info = f"Output: {current}. Step is 0, counter remains unchanged."
-            return float(current), int(current), info
+            display_current = self.counter + display_offset
+            info = f"Output: {display_current}. Step is 0, counter remains unchanged."
+            return float(display_current), int(display_current), info
 
-        # Determine the counting mode based on internal_start vs internal_stop.
-        if internal_start < internal_stop:  # Increment mode
+        # Increment mode.
+        if internal_start < internal_stop:
             next_value = self.counter + step
             if next_value >= internal_stop:
+                # In reset branch, output the internal_stop directly (without adding offset)
+                # so that with start=0 and stop=8 the final displayed number is 7.
                 output = internal_stop
-                # Reset to the internal start after outputting the stop value.
+                display_output = output  # <-- FIX: remove extra display_offset addition.
+                display_reset = internal_start + display_offset
+                info = (
+                    f"Output: {display_output}. Reached or exceeded stop; "
+                    f"counter will reset to {display_reset} on next call."
+                )
                 self.counter = internal_start
             else:
                 output = self.counter
                 self.counter = next_value
-        else:  # Decrement mode
+                display_output = output + display_offset
+                info = (
+                    f"Output: {display_output}. Next will be {self.counter + display_offset}."
+                )
+        # Decrement mode remains unchanged.
+        else:
             next_value = self.counter - step
             if next_value <= internal_stop:
                 output = internal_stop
+                display_output = output + display_offset
+                display_reset = internal_start + display_offset
+                info = (
+                    f"Output: {display_output}. Reached or exceeded stop; "
+                    f"counter will reset to {display_reset} on next call."
+                )
                 self.counter = internal_start
             else:
                 output = self.counter
                 self.counter = next_value
+                display_output = output + display_offset
+                info = (
+                    f"Output: {display_output}. Next will be {self.counter + display_offset}."
+                )
 
-        info = f"Output: {output}. Next will be {self.counter}."
-        return float(output), int(output), info
+        return float(display_output), int(display_output), info
