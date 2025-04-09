@@ -62,6 +62,9 @@ class PreviewCallback:
         self.vae = vae
         self.model = model
         self.output_dir = folder_paths.get_output_directory()
+        self.type = "output"
+        self.prefix_append = ""
+        self.compress_level = 4
         # Initialize previewer using the model's latent_format
         self.previewer = latent_preview.get_previewer("cpu", model.model.latent_format)
         if self.previewer is None:
@@ -83,7 +86,7 @@ class PreviewCallback:
                     image = (image * 255).astype(np.uint8)
                     image = Image.fromarray(image[0])
                 
-                # Use the same approach as SaveImage for saving files
+                # Use the same approach as ComfyDeployOutputImage for saving files
                 filename_prefix = f"preview_step_{step:03d}"
                 full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
                     filename_prefix, 
@@ -99,10 +102,20 @@ class PreviewCallback:
                 
                 # Save the image with metadata
                 file = f"{filename}_{counter:05}_.png"
-                filepath = os.path.join(full_output_folder, file)
-                image.save(filepath, pnginfo=metadata, compress_level=4)
+                file_path = os.path.join(full_output_folder, file)
                 
-                print(f"Saved preview image to: {filepath}")
+                # Save with PNG compression
+                image.save(file_path, pnginfo=metadata, compress_level=self.compress_level)
+                
+                # Create result entry similar to ComfyDeployOutputImage
+                result = {
+                    "filename": file,
+                    "subfolder": subfolder,
+                    "type": self.type,
+                    "output_id": "preview_images"
+                }
+                
+                print(f"Saved preview image to: {file_path}")
 
 class KSampler:
     @classmethod
