@@ -5,6 +5,7 @@ from .replicate_Flux_Fill import ReplicateAPI_flux_fill_pro
 from .iframe_view import IframeView
 from .queue_counter_reset import DynamicQueueCounter
 from .custom_name_selector import IndexedStringSelector
+from .ksampler_fun import KSampler
 WEB_DIRECTORY = "./js"
 
 NODE_CLASS_MAPPINGS = {
@@ -13,7 +14,8 @@ NODE_CLASS_MAPPINGS = {
     "ReplicateAPI_flux_fill_pro": ReplicateAPI_flux_fill_pro,
     "IframeView": IframeView,
     "DynamicQueueCounter": DynamicQueueCounter,
-    "IndexedStringSelector": IndexedStringSelector
+    "IndexedStringSelector": IndexedStringSelector,
+    "Fun KSampler": KSampler
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "LayeredInfiniteZoom": "Layered Infinite Zoom",
@@ -21,7 +23,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ReplicateAPI_flux_fill_pro": "Replicate flux fill pro",
     "IframeView": "Iframe View",
     "DynamicQueueCounter": "Dynamic Queue Counter",
-    "IndexedStringSelector": "Indexed String Selector"
+    "IndexedStringSelector": "Indexed String Selector",
+    "Fun KSampler": "Fun KSampler"
 }
 
 __all__ = [
