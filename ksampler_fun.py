@@ -53,7 +53,7 @@ def fun_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, neg
     
     out = latent.copy()
     out["samples"] = samples
-    return (out, None)  # Return None for preview_latents since we're saving directly
+    return (out, callback.get_results())  # Return the results from the callback
 
 class PreviewCallback:
     def __init__(self, latent, preview_steps_list, vae, model):
@@ -65,10 +65,14 @@ class PreviewCallback:
         self.type = "output"
         self.prefix_append = ""
         self.compress_level = 4
+        self.results = []  # Store results for later retrieval
         # Initialize previewer using the model's latent_format
         self.previewer = latent_preview.get_previewer("cpu", model.model.latent_format)
         if self.previewer is None:
             print("Warning: No preview method available, falling back to full VAE for previews")
+
+    def get_results(self):
+        return {"ui": {"images": self.results}}
 
     def __call__(self, step, denoised, x, total_steps):
         if step in self.preview_steps_list:
@@ -114,6 +118,9 @@ class PreviewCallback:
                     "type": self.type,
                     "output_id": "preview_images"
                 }
+                
+                # Add to results list
+                self.results.append(result)
                 
                 print(f"Saved preview image to: {file_path}")
 
