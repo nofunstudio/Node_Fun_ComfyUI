@@ -10,6 +10,14 @@ import os
 import folder_paths
 import numpy as np
 from PIL import Image
+from PIL.PngImagePlugin import PngInfo
+import json
+
+# Add debug print for output directory
+output_dir = folder_paths.get_output_directory()
+print(f"Debug - Output directory path: {output_dir}")
+print(f"Debug - Output directory exists: {os.path.exists(output_dir)}")
+print(f"Debug - Output directory is writable: {os.access(output_dir, os.W_OK) if os.path.exists(output_dir) else False}")
 
 def fun_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, vae, denoise=1.0, disable_noise=False, start_step=None, last_step=None, force_full_denoise=False, preview_steps=5, skip_steps=0):
     latent_image = latent["samples"]
@@ -75,10 +83,26 @@ class PreviewCallback:
                     image = (image * 255).astype(np.uint8)
                     image = Image.fromarray(image[0])
                 
-                # Save the image
-                filename = f"preview_step_{step:03d}.png"
-                filepath = os.path.join(self.output_dir, filename)
-                image.save(filepath)
+                # Use the same approach as SaveImage for saving files
+                filename_prefix = f"preview_step_{step:03d}"
+                full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
+                    filename_prefix, 
+                    self.output_dir,
+                    image.size[0],  # width
+                    image.size[1]   # height
+                )
+                
+                # Create metadata
+                metadata = PngInfo()
+                metadata.add_text("step", str(step))
+                metadata.add_text("total_steps", str(total_steps))
+                
+                # Save the image with metadata
+                file = f"{filename}_{counter:05}_.png"
+                filepath = os.path.join(full_output_folder, file)
+                image.save(filepath, pnginfo=metadata, compress_level=4)
+                
+                print(f"Saved preview image to: {filepath}")
 
 class KSampler:
     @classmethod
