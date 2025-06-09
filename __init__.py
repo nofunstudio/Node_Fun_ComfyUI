@@ -6,6 +6,7 @@ from .iframe_view import IframeView
 from .queue_counter_reset import DynamicQueueCounter
 from .custom_name_selector import IndexedStringSelector
 from .ksampler_fun import KSampler
+from .fal_recraft_upscale import FalAPI_recraft_upscale
 WEB_DIRECTORY = "./js"
 
 NODE_CLASS_MAPPINGS = {
@@ -15,7 +16,8 @@ NODE_CLASS_MAPPINGS = {
     "IframeView": IframeView,
     "DynamicQueueCounter": DynamicQueueCounter,
     "IndexedStringSelector": IndexedStringSelector,
-    "Fun KSampler": KSampler
+    "Fun KSampler": KSampler,
+    "FalAPI_recraft_upscale": FalAPI_recraft_upscale
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "LayeredInfiniteZoom": "Layered Infinite Zoom",
@@ -24,7 +26,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IframeView": "Iframe View",
     "DynamicQueueCounter": "Dynamic Queue Counter",
     "IndexedStringSelector": "Indexed String Selector",
-    "Fun KSampler": "Fun KSampler"
+    "Fun KSampler": "Fun KSampler",
+    "FalAPI_recraft_upscale": "Fal API Recraft Upscale"
 }
 
 __all__ = [
