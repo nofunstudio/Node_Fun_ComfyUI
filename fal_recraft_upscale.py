@@ -98,31 +98,50 @@ class FalAPI_recraft_upscale:
 
     def on_queue_update(self, update):
         """Handle queue updates and log messages"""
-        if isinstance(update, fal_client.InProgress):
-            for log in update.logs:
-                print(f"[Recraft Upscale] {log['message']}")
+        try:
+            if isinstance(update, fal_client.InProgress):
+                for log in update.logs:
+                    print(f"[Recraft Upscale] {log['message']}")
+        except Exception as e:
+            print(f"[Recraft Upscale] Error in queue update: {e}")
 
     def upscale(self, api_token, image, enable_safety_checker):
         """
         Upscale image using fal-ai/recraft/upscale/crisp
         """
+        print(f"[Recraft Upscale] Starting upscale process...")
+        
         # For errors, return an empty 1024x1024 image
         empty_image = torch.zeros((1, 1024, 1024, 3))
 
         # Make sure we have an API token
         if not api_token:
-            raise ValueError("A FAL API token is required.")
+            error_msg = "A FAL API token is required."
+            print(f"[Recraft Upscale] Error: {error_msg}")
+            raise ValueError(error_msg)
+        
+        # Validate image input
+        if image is None:
+            error_msg = "Image input is required."
+            print(f"[Recraft Upscale] Error: {error_msg}")
+            raise ValueError(error_msg)
+            
+        print(f"[Recraft Upscale] Input image shape: {image.shape}")
+        print(f"[Recraft Upscale] Image tensor type: {type(image)}")
 
         try:
             # 1) Set up FAL client with API token
             os.environ["FAL_KEY"] = api_token
+            print(f"[Recraft Upscale] API token set, processing image...")
 
             # 2) Convert ComfyUI image tensor to temporary file
             image_file = self.tensor_to_tempfile(image)
+            print(f"[Recraft Upscale] Created temp file: {image_file.name}")
             
             # 3) Upload image to FAL storage and get URL
-            with open(image_file.name, "rb") as f:
-                image_url = fal_client.upload_file(f)
+            print(f"[Recraft Upscale] Uploading image to FAL storage...")
+            image_url = fal_client.upload_file(image_file)
+            print(f"[Recraft Upscale] Image uploaded successfully: {image_url}")
 
             # 4) Build the input arguments
             arguments = {
@@ -139,10 +158,12 @@ class FalAPI_recraft_upscale:
                 with_logs=True,
                 on_queue_update=self.on_queue_update,
             )
+            print(f"[Recraft Upscale] Upscale completed successfully")
 
             # 6) Clean up temporary file
             image_file.close()
             os.remove(image_file.name)
+            print(f"[Recraft Upscale] Cleaned up temp file")
 
             if not result or not result.get("image"):
                 raise ValueError("No valid result from fal_client.subscribe().")
@@ -179,8 +200,18 @@ class FalAPI_recraft_upscale:
             print(f"[Recraft Upscale] Saved metadata -> {metadata_path}")
 
             # 10) Convert to ComfyUI's IMAGE format (1, H, W, 3)
-            img_tensor = torch.from_numpy(np.array(pil_img).astype(np.float32) / 255.0)
-            img_tensor = img_tensor.unsqueeze(0)
+            print(f"[Recraft Upscale] Converting result image to tensor format...")
+            img_array = np.array(pil_img).astype(np.float32) / 255.0
+            img_tensor = torch.from_numpy(img_array)
+            
+            # Ensure correct tensor shape: (1, H, W, 3)
+            if len(img_tensor.shape) == 3:
+                img_tensor = img_tensor.unsqueeze(0)
+            elif len(img_tensor.shape) == 2:
+                # Handle grayscale
+                img_tensor = img_tensor.unsqueeze(0).unsqueeze(-1).repeat(1, 1, 1, 3)
+                
+            print(f"[Recraft Upscale] Final tensor shape: {img_tensor.shape}")
 
             # 11) Return the image tensor & metadata JSON string
             return (img_tensor, json.dumps(generation_info, indent=2))
