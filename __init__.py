@@ -8,6 +8,7 @@ from .custom_name_selector import IndexedStringSelector
 from .ksampler_fun import KSampler
 from .fal_recraft_upscale import FalAPI_recraft_upscale
 from .fal_kling_video import FalAPI_kling_video
+from .string_lower import StringLower
 WEB_DIRECTORY = "./js"
 
 NODE_CLASS_MAPPINGS = {
@@ -19,7 +20,8 @@ NODE_CLASS_MAPPINGS = {
     "IndexedStringSelector": IndexedStringSelector,
     "Fun KSampler": KSampler,
     "FalAPI_recraft_upscale": FalAPI_recraft_upscale,
-    "FalAPI_kling_video": FalAPI_kling_video
+    "FalAPI_kling_video": FalAPI_kling_video,
+    "StringLower": StringLower
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "LayeredInfiniteZoom": "Layered Infinite Zoom",
@@ -30,7 +32,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IndexedStringSelector": "Indexed String Selector",
     "Fun KSampler": "Fun KSampler",
     "FalAPI_recraft_upscale": "Fal API Recraft Upscale",
-    "FalAPI_kling_video": "Fal API Kling Video"
+    "FalAPI_kling_video": "Fal API Kling Video",
+    "StringLower": "String to Lowercase"
 }
 
 __all__ = [
