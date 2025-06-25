@@ -10,10 +10,26 @@ def tensor_to_pil(tensor):
     
     # Convert from tensor to numpy array and scale to 0-255
     np_image = (tensor.cpu().numpy() * 255).astype(np.uint8)
-    return Image.fromarray(np_image, 'RGB')
+    
+    # Handle different channel counts
+    if np_image.shape[2] == 4:  # RGBA
+        return Image.fromarray(np_image, 'RGBA')
+    elif np_image.shape[2] == 3:  # RGB
+        return Image.fromarray(np_image, 'RGB')
+    else:  # Grayscale or other
+        return Image.fromarray(np_image[:,:,0], 'L').convert('RGBA')
 
 def pil_to_tensor(pil_image):
     """Convert PIL Image to ComfyUI tensor"""
+    # Convert to RGB for output (ComfyUI typically expects RGB)
+    if pil_image.mode == 'RGBA':
+        # Create a white background and composite the RGBA image onto it
+        background = Image.new('RGB', pil_image.size, (255, 255, 255))
+        background.paste(pil_image, mask=pil_image.split()[3])  # Use alpha channel as mask
+        pil_image = background
+    elif pil_image.mode != 'RGB':
+        pil_image = pil_image.convert('RGB')
+    
     np_image = np.array(pil_image).astype(np.float32) / 255.0
     tensor = torch.from_numpy(np_image)
     return tensor.unsqueeze(0)  # Add batch dimension
@@ -50,20 +66,28 @@ class MultiAlphaComposite:
         if len(valid_images) < 2:
             raise ValueError("At least 2 images are required for compositing")
         
-        # Convert ComfyUI tensors to PIL Images
-        pil_images = [tensor_to_pil(img) for img in valid_images]
+        print(f"Debug: Processing {len(valid_images)} images for layer compositing")
         
-        # Convert to RGBA for alpha compositing
-        layers = [img.convert("RGBA") for img in pil_images]
+        # Convert ComfyUI tensors to PIL Images and ensure RGBA
+        layers = []
+        for i, img_tensor in enumerate(valid_images):
+            pil_img = tensor_to_pil(img_tensor)
+            # Convert to RGBA for alpha compositing (like Photoshop layers)
+            rgba_layer = pil_img.convert('RGBA')
+            layers.append(rgba_layer)
+            print(f"Debug: Layer {i+1} - Size: {rgba_layer.size}, Mode: {rgba_layer.mode}")
         
-        # Composite layers
-        base = layers[0]
-        for layer in layers[1:]:
-            # Resize layer to match base if needed
-            if layer.size != base.size:
-                layer = layer.resize(base.size, Image.LANCZOS)
-            base = Image.alpha_composite(base, layer)
+        # Start with the bottom layer (image1)
+        result = layers[0]
+        print(f"Debug: Starting with base layer (image1)")
+        
+        # Stack each subsequent layer on top (like Photoshop)
+        for i in range(1, len(layers)):
+            print(f"Debug: Compositing layer {i+1} on top")
+            result = Image.alpha_composite(result, layers[i])
+        
+        print(f"Debug: Final composite size: {result.size}, mode: {result.mode}")
         
         # Convert back to ComfyUI tensor format
-        result_tensor = pil_to_tensor(base.convert("RGB"))
+        result_tensor = pil_to_tensor(result)
         return (result_tensor,) 
