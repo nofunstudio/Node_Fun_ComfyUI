@@ -9,6 +9,7 @@ from .ksampler_fun import KSampler
 from .fal_recraft_upscale import FalAPI_recraft_upscale
 from .fal_kling_video import FalAPI_kling_video
 from .string_lower import StringLower
+from .multi_alpha_composite import MultiAlphaComposite
 WEB_DIRECTORY = "./js"
 
 NODE_CLASS_MAPPINGS = {
@@ -21,7 +22,8 @@ NODE_CLASS_MAPPINGS = {
     "Fun KSampler": KSampler,
     "FalAPI_recraft_upscale": FalAPI_recraft_upscale,
     "FalAPI_kling_video": FalAPI_kling_video,
-    "StringLower": StringLower
+    "StringLower": StringLower,
+    "MultiAlphaComposite": MultiAlphaComposite
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "LayeredInfiniteZoom": "Layered Infinite Zoom",
@@ -33,7 +35,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "Fun KSampler": "Fun KSampler",
     "FalAPI_recraft_upscale": "Fal API Recraft Upscale",
     "FalAPI_kling_video": "Fal API Kling Video",
-    "StringLower": "String to Lowercase"
+    "StringLower": "String to Lowercase",
+    "MultiAlphaComposite": "Multi Alpha Composite"
 }
 
 __all__ = [
