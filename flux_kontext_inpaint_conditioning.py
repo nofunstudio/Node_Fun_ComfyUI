@@ -1,5 +1,5 @@
 # Copyright 2025 ZenAI, Inc.
-# Author: @Trgtuan_10, @vuongminh1907 (modified)
+# Author: @Trgtuan_10, @vuongminh1907 (modified with padding fix)
 import torch
 from comfy.comfy_types import IO
 import node_helpers
@@ -13,7 +13,7 @@ class FluxKontextInpaintingConditioning:
                 "vae":               ("VAE", ),
                 "pixels":            ("IMAGE", ),
                 "mask":              ("MASK", ),
-                "reference_latents": ("LATENT", ),  # ← new face‐latent port
+                "reference_latents": ("LATENT", ),  # face-latent port
                 "noise_mask":        ("BOOLEAN", {
                                          "default": True,
                                          "tooltip": "Restrict noise to the mask region."
@@ -37,50 +37,58 @@ class FluxKontextInpaintingConditioning:
         return conditioning
 
     def encode(self, conditioning, pixels, vae, mask, reference_latents, noise_mask=True):
-        # 1) Align dims to multiples of 8
-        h8 = (pixels.shape[1] // 8) * 8
-        w8 = (pixels.shape[2] // 8) * 8
-
-        # 2) Upsample mask to image size
+        # 1) Upsample mask to image size with nearest-neighbor to avoid blur
         mask = torch.nn.functional.interpolate(
             mask.reshape((-1, 1, mask.shape[-2], mask.shape[-1])),
             size=(pixels.shape[1], pixels.shape[2]),
-            mode="bilinear"
+            mode="nearest"
         )
 
-        # 3) Crop or pad if needed
+        # 2) Pad pixels and mask to multiples of 8 (no cropping, avoids shift)
         orig_pixels = pixels
         pixels = orig_pixels.clone()
-        if pixels.shape[1] != h8 or pixels.shape[2] != w8:
-            y_off = (pixels.shape[1] - h8) // 2
-            x_off = (pixels.shape[2] - w8) // 2
-            pixels = pixels[:, y_off:y_off+h8, x_off:x_off+w8, :]
-            mask   = mask[:, :, y_off:y_off+h8, x_off:x_off+w8]
+        # Convert to NCHW for padding
+        pixels_chw = pixels.permute(0, 3, 1, 2)
+        _, _, H, W = pixels_chw.shape
+        pad_h = (8 - (H % 8)) % 8
+        pad_w = (8 - (W % 8)) % 8
+        # pad = (left, right, top, bottom)
+        pad = (pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2)
+        pixels_chw = torch.nn.functional.pad(pixels_chw, pad, mode='reflect')
+        mask = torch.nn.functional.pad(mask, pad, mode='nearest')
+        # Back to BHWC
+        pixels = pixels_chw.permute(0, 2, 3, 1)
 
-        # 4) Prepare masked pixels for concat encoding
+        # 3) Prepare masked pixels for concat encoding
         m = (1.0 - mask.round()).squeeze(1)  # 1=keep, 0=inpaint
         for c in range(3):
-            pixels[:,:,:,c] = (pixels[:,:,:,c] - 0.5) * m + 0.5
+            pixels[:, :, :, c] = (pixels[:, :, :, c] - 0.5) * m + 0.5
 
-        # 5) Encode latents
+        # 4) Encode latents
         concat_latent = vae.encode(pixels)
         orig_latent   = vae.encode(orig_pixels)
         ref_latent    = reference_latents  # already a dict {"samples": tensor}
 
-        # 6) Build conditioning dict
+        # 5) Build conditioning dict
         c = node_helpers.conditioning_set_values(
             conditioning,
-            {
-                "concat_latent_image": concat_latent,
-                "concat_mask": mask
-            }
+            {"concat_latent_image": concat_latent,
+             "concat_mask": mask}
         )
-        # 7) Append the face‐reference latent so it's only used in the mask
+        # 6) Append the face-reference latent so it's only used in the mask
         conditioning = self._append_reference_latent(c, ref_latent)
 
-        # 8) Prepare output latent
+        # 7) Prepare output latent (orig_latent covers full image)
         out_latent = {"samples": orig_latent}
         if noise_mask:
             out_latent["noise_mask"] = mask
 
-        return (conditioning, out_latent) 
+        return (conditioning, out_latent)
+
+NODE_CLASS_MAPPINGS = {
+    "Kontext Inpainting Conditioning": FluxKontextInpaintingConditioning,
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "Kontext Inpainting Conditioning": "Kontext Inpainting Conditioning",
+}
