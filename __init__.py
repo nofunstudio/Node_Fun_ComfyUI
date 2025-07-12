@@ -10,6 +10,7 @@ from .fal_recraft_upscale import FalAPI_recraft_upscale
 from .fal_kling_video import FalAPI_kling_video
 from .string_lower import StringLower
 from .multi_alpha_composite import MultiAlphaComposite
+from .flux_kontext_inpaint_conditioning import FluxKontextInpaintingConditioning
 WEB_DIRECTORY = "./js"
 
 NODE_CLASS_MAPPINGS = {
@@ -23,7 +24,8 @@ NODE_CLASS_MAPPINGS = {
     "FalAPI_recraft_upscale": FalAPI_recraft_upscale,
     "FalAPI_kling_video": FalAPI_kling_video,
     "StringLower": StringLower,
-    "MultiAlphaComposite": MultiAlphaComposite
+    "MultiAlphaComposite": MultiAlphaComposite,
+    "FluxKontextInpaintingConditioning": FluxKontextInpaintingConditioning
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "LayeredInfiniteZoom": "Layered Infinite Zoom",
@@ -36,7 +38,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FalAPI_recraft_upscale": "Fal API Recraft Upscale",
     "FalAPI_kling_video": "Fal API Kling Video",
     "StringLower": "String to Lowercase",
-    "MultiAlphaComposite": "Multi Alpha Composite"
+    "MultiAlphaComposite": "Multi Alpha Composite",
+    "FluxKontextInpaintingConditioning": "No Fun Flux Kontext Inpaint Conditioning"
 }
 
 __all__ = [
