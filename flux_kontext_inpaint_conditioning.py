@@ -26,11 +26,6 @@ class FluxKontextInpaintingConditioning:
     FUNCTION = "encode"
     CATEGORY = "conditioning/inpaint"
 
-    def _encode_latent(self, vae, pixels):
-        """Encode raw pixels into a latent dict."""
-        t = vae.encode(pixels[:,:,:,:3])
-        return {"samples": t}
-
     def _append_reference_latent(self, conditioning, ref_latent):
         """Append the face-reference latent to conditioning."""
         if ref_latent is not None:
@@ -70,7 +65,7 @@ class FluxKontextInpaintingConditioning:
         # 5) Encode latents
         concat_latent = vae.encode(pixels)
         orig_latent   = vae.encode(orig_pixels)
-        ref_latent    = self._encode_latent(vae, reference_latents) if reference_latents is not None else None
+        ref_latent    = reference_latents  # already a dict {"samples": tensor}
 
         # 6) Build conditioning dict
         c = node_helpers.conditioning_set_values(
