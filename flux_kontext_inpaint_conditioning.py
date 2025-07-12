@@ -55,7 +55,7 @@ class FluxKontextInpaintingConditioning:
         # pad = (left, right, top, bottom)
         pad = (pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2)
         pixels_chw = torch.nn.functional.pad(pixels_chw, pad, mode='reflect')
-        mask = torch.nn.functional.pad(mask, pad, mode='nearest')
+        mask = torch.nn.functional.pad(mask, pad, mode='replicate')
         # Back to BHWC
         pixels = pixels_chw.permute(0, 2, 3, 1)
 
