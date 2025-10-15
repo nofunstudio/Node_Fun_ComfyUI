@@ -8,6 +8,7 @@ from .custom_name_selector import IndexedStringSelector
 from .ksampler_fun import KSampler
 from .fal_recraft_upscale import FalAPI_recraft_upscale
 from .fal_kling_video import FalAPI_kling_video
+from .fal_seedance_video import FalAPI_seedance_video
 from .string_lower import StringLower
 from .multi_alpha_composite import MultiAlphaComposite
 from .flux_kontext_inpaint_conditioning import FluxKontextInpaintingConditioning
@@ -23,6 +24,7 @@ NODE_CLASS_MAPPINGS = {
     "Fun KSampler": KSampler,
     "FalAPI_recraft_upscale": FalAPI_recraft_upscale,
     "FalAPI_kling_video": FalAPI_kling_video,
+    "FalAPI_seedance_video": FalAPI_seedance_video,
     "StringLower": StringLower,
     "MultiAlphaComposite": MultiAlphaComposite,
     "FluxKontextInpaintingConditioning": FluxKontextInpaintingConditioning
@@ -37,6 +39,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "Fun KSampler": "Fun KSampler",
     "FalAPI_recraft_upscale": "Fal API Recraft Upscale",
     "FalAPI_kling_video": "Fal API Kling Video",
+    "FalAPI_seedance_video": "Fal API Seedance Video",
     "StringLower": "String to Lowercase",
     "MultiAlphaComposite": "Multi Alpha Composite",
     "FluxKontextInpaintingConditioning": "No Fun Flux Kontext Inpaint Conditioning"
