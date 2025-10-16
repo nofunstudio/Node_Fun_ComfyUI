@@ -14,6 +14,8 @@ class DynamicQueueCounter:
                 # Widget shows stop as 8
                 "stop": ("FLOAT", {"default": 8.0}),
                 "step": ("FLOAT", {"default": 1.0}),
+                # Toggle to reset counter to start
+                "reset": ("BOOLEAN", {"default": False}),
             }
         }
 
@@ -27,16 +29,25 @@ class DynamicQueueCounter:
         # Always return NaN so that ComfyUI re-runs this node each prompt.
         return float("NaN")
 
-    def node(self, start, stop, step):
+    def node(self, start, stop, step, reset):
         display_offset = 1.0
         # Adjust widget values for internal calculation.
         # (The displayed value is normally calculated as internal_value + display_offset.)
         internal_start = float(start) - display_offset
         internal_stop = float(stop) - display_offset
 
+        # Initialize counter if this is the first run
         if not hasattr(self, "counter"):
             self.counter = internal_start
+            self.last_reset = reset
             print("DynamicQueueCounter: Initialized counter =", self.counter)
+        else:
+            # Check if user toggled the reset button
+            if reset != self.last_reset:
+                # Reset toggle state changed, reset counter to start
+                self.counter = internal_start
+                self.last_reset = reset
+                print(f"DynamicQueueCounter: Reset toggled - counter reset to {self.counter} (display: {internal_start + display_offset})")
 
         if step == 0:
             display_current = self.counter + display_offset

@@ -3,11 +3,15 @@ import time
 import requests
 import tempfile
 import json
+import random
 import numpy as np
 import torch
+import asyncio
+import folder_paths
 from io import BytesIO
 from PIL import Image
 import fal_client
+from comfy_api.input_impl import VideoFromFile
 
 class FalAPI_seedance_video:
     @classmethod
@@ -85,62 +89,37 @@ class FalAPI_seedance_video:
             }
         }
 
-    RETURN_TYPES = ("STRING", "STRING",)
-    RETURN_NAMES = ("video_path", "generation_info",)
+    RETURN_TYPES = ("VIDEO", "STRING", "STRING",)
+    RETURN_NAMES = ("video", "video_path", "generation_info",)
     FUNCTION = "generate_video"
     CATEGORY = "FAL"
 
     def __init__(self):
-        # Directory structure for saving generated videos
-        self.output_dir = "output/API/FAL/seedance-video"
-        self.metadata_dir = os.path.join(self.output_dir, "metadata")
-
-        os.makedirs(self.output_dir, exist_ok=True)
+        # Use ComfyUI's temp directory for temporary video storage
+        self.temp_dir = folder_paths.get_temp_directory()
+        self.metadata_dir = os.path.join(self.temp_dir, "seedance_metadata")
         os.makedirs(self.metadata_dir, exist_ok=True)
 
-    def get_next_number(self):
+    def get_temp_filename(self):
         """
-        Looks at existing .mp4/.mov files and picks the next integer
-        filename index (e.g. 001, 002, etc.).
+        Generate a unique temporary filename using timestamp and random component.
         """
-        valid_exts = {".mp4", ".mov", ".avi"}
-        files = [f for f in os.listdir(self.output_dir) 
-                 if os.path.splitext(f)[1].lower() in valid_exts]
-        if not files:
-            return 1
+        timestamp = int(time.time() * 1000)
+        random_id = random.randint(1000, 9999)
+        return f"seedance_{timestamp}_{random_id}.mp4"
 
-        numbers = []
-        for file_name in files:
-            base, _ = os.path.splitext(file_name)
-            try:
-                numbers.append(int(base))
-            except ValueError:
-                pass
-        
-        if numbers:
-            return max(numbers) + 1
-        else:
-            return 1
+    def save_video_and_metadata(self, video_content, generation_info, filename):
+        """
+        Saves the generated video to temp directory, plus metadata as a .json.
+        """
+        filepath = os.path.join(self.temp_dir, filename)
 
-    def create_filename(self, number):
-        """
-        Zero-padded filenames ending in .mp4 (e.g., '001.mp4').
-        """
-        return f"{number:03d}.mp4"
-
-    def save_video_and_metadata(self, video_content, generation_info, number):
-        """
-        Saves the generated video as .mp4, plus metadata as a .json.
-        """
-        filename = self.create_filename(number)
-        filepath = os.path.join(self.output_dir, filename)
-
-        # Save video content
+        # Save video content to temp directory
         with open(filepath, 'wb') as f:
             f.write(video_content)
 
-        # Create metadata filename (001_metadata.json)
-        metadata_filename = f"{number:03d}_metadata.json"
+        # Create metadata filename based on video filename
+        metadata_filename = f"{os.path.splitext(filename)[0]}_metadata.json"
         metadata_filepath = os.path.join(self.metadata_dir, metadata_filename)
 
         # Write out metadata
@@ -158,10 +137,11 @@ class FalAPI_seedance_video:
         except Exception as e:
             print(f"[Seedance Video] Error in queue update: {e}")
 
-    def generate_video(self, api_token, image, prompt, aspect_ratio, resolution, 
+    async def generate_video(self, api_token, image, prompt, aspect_ratio, resolution, 
                       duration, camera_fixed, enable_safety_checker, seed=-1):
         """
         Generate video using fal-ai/bytedance/seedance/v1/pro/image-to-video
+        (Async execution for parallel processing)
         """
         print(f"[Seedance Video] Starting video generation process...")
         
@@ -201,18 +181,18 @@ class FalAPI_seedance_video:
             except Exception as e:
                 print(f"[Seedance Video] fal_client check failed: {str(e)}")
 
-            # 2) Convert ComfyUI image tensor to temporary file
+            # 2) Convert ComfyUI image tensor to temporary file (run in thread pool)
             try:
-                temp_file_path = self.tensor_to_tempfile(image)
+                temp_file_path = await asyncio.to_thread(self.tensor_to_tempfile, image)
                 print(f"[Seedance Video] Created temp file: {temp_file_path}")
             except Exception as e:
                 print(f"[Seedance Video] Error creating temp file: {str(e)}")
                 raise
             
-            # 3) Upload image to FAL storage and get URL
+            # 3) Upload image to FAL storage and get URL (run in thread pool)
             try:
                 print(f"[Seedance Video] Uploading image to FAL storage...")
-                image_url = fal_client.upload_file(temp_file_path)
+                image_url = await asyncio.to_thread(fal_client.upload_file, temp_file_path)
                 print(f"[Seedance Video] Image uploaded successfully: {image_url}")
             except Exception as e:
                 print(f"[Seedance Video] Error uploading file: {str(e)}")
@@ -240,9 +220,10 @@ class FalAPI_seedance_video:
 
             print(f"[Seedance Video] Starting video generation...")
 
-            # 5) Call fal_client.subscribe() 
+            # 5) Call fal_client.subscribe() (run in thread pool for async execution)
             try:
-                result = fal_client.subscribe(
+                result = await asyncio.to_thread(
+                    fal_client.subscribe,
                     "fal-ai/bytedance/seedance/v1/pro/image-to-video",
                     arguments=arguments,
                     with_logs=True,
@@ -270,14 +251,14 @@ class FalAPI_seedance_video:
             video_url = video_data["url"]
             seed_used = result.get("seed", "unknown")
 
-            # 8) Download the generated video
+            # 8) Download the generated video (run in thread pool)
             print(f"[Seedance Video] Downloading video from: {video_url}")
-            resp = requests.get(video_url)
+            resp = await asyncio.to_thread(requests.get, video_url)
             if resp.status_code != 200:
                 raise ConnectionError(f"Failed to download video. HTTP {resp.status_code}")
 
-            # 9) Save the video & metadata
-            number = self.get_next_number()
+            # 9) Save the video to temp directory & metadata (run in thread pool)
+            temp_filename = self.get_temp_filename()
             
             generation_info = {
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -297,22 +278,27 @@ class FalAPI_seedance_video:
                 "fal_result": result
             }
 
-            video_path, metadata_path = self.save_video_and_metadata(resp.content, generation_info, number)
-            print(f"[Seedance Video] Saved video -> {video_path}")
+            video_path, metadata_path = await asyncio.to_thread(
+                self.save_video_and_metadata, resp.content, generation_info, temp_filename
+            )
+            print(f"[Seedance Video] Saved temp video -> {video_path}")
             print(f"[Seedance Video] Saved metadata -> {metadata_path}")
 
-            # 10) Return the video path & metadata JSON string
-            return (video_path, json.dumps(generation_info, indent=2))
+            # 10) Create VideoFromFile object for ComfyUI's VIDEO type
+            video_output = VideoFromFile(video_path)
+            
+            # 11) Return the video object, video path string & metadata JSON string
+            return (video_output, video_path, json.dumps(generation_info, indent=2))
 
         except Exception as e:
-            # Return empty path and an error message in JSON
+            # Return None for video, empty path and an error message in JSON
             error_info = {
                 "error": f"Seedance video generation failed: {str(e)}",
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "model": "fal-ai/bytedance/seedance/v1/pro/image-to-video"
             }
             print(f"[Seedance Video] Error: {str(e)}")
-            return (empty_path, json.dumps(error_info, indent=2))
+            return (None, empty_path, json.dumps(error_info, indent=2))
 
     def tensor_to_tempfile(self, tensor):
         """

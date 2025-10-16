@@ -12,6 +12,7 @@ from .fal_seedance_video import FalAPI_seedance_video
 from .string_lower import StringLower
 from .multi_alpha_composite import MultiAlphaComposite
 from .flux_kontext_inpaint_conditioning import FluxKontextInpaintingConditioning
+from .load_image_batch_fun import LoadImageBatchFun
 WEB_DIRECTORY = "./js"
 
 NODE_CLASS_MAPPINGS = {
@@ -27,7 +28,8 @@ NODE_CLASS_MAPPINGS = {
     "FalAPI_seedance_video": FalAPI_seedance_video,
     "StringLower": StringLower,
     "MultiAlphaComposite": MultiAlphaComposite,
-    "FluxKontextInpaintingConditioning": FluxKontextInpaintingConditioning
+    "FluxKontextInpaintingConditioning": FluxKontextInpaintingConditioning,
+    "LoadImageBatchFun": LoadImageBatchFun
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "LayeredInfiniteZoom": "Layered Infinite Zoom",
@@ -42,7 +44,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FalAPI_seedance_video": "Fal API Seedance Video",
     "StringLower": "String to Lowercase",
     "MultiAlphaComposite": "Multi Alpha Composite",
-    "FluxKontextInpaintingConditioning": "No Fun Flux Kontext Inpaint Conditioning"
+    "FluxKontextInpaintingConditioning": "No Fun Flux Kontext Inpaint Conditioning",
+    "LoadImageBatchFun": "Load Image Batch (Fun)"
 }
 
 __all__ = [
