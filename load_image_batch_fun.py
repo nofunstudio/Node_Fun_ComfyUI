@@ -34,11 +34,8 @@ class LoadImageBatchFun:
         Initialize instance-specific variables to prevent shared state issues.
         This is the key fix for supporting multiple instances.
         """
-        self.current_images = []
-        self.current_filenames = []
         self.current_index = 0
         self.last_hash = None
-        self.cached_images = []
         self.cached_filenames = []
 
     def load_batch_images(self, mode, index, label, path, pattern, allow_RGBA_output):
@@ -58,39 +55,38 @@ class LoadImageBatchFun:
             raise ValueError(f"Path is not a directory: {path}")
         
         # Generate a hash for path/pattern to determine if we need to reload images
-        # Don't include index/mode in this hash so we can reuse cached images
+        # Don't include index/mode in this hash so we can reuse cached image paths
         cache_hash = hashlib.md5(
-            f"{path}_{pattern}_{allow_RGBA_output}".encode()
+            f"{path}_{pattern}".encode()
         ).hexdigest()
         
-        # Load images if cache is invalid or parameters changed
-        if self.last_hash != cache_hash or not self.cached_images:
-            print(f"[Load Image Batch Fun] Loading images from: {path}")
-            self.cached_images, self.cached_filenames = self._load_images_from_path(
-                path, pattern, allow_RGBA_output
+        # Load image paths if cache is invalid or parameters changed
+        if self.last_hash != cache_hash or not self.cached_filenames:
+            print(f"[Load Image Batch Fun] Loading image paths from: {path}")
+            self.cached_filenames = self._load_images_from_path(
+                path, pattern
             )
             self.last_hash = cache_hash
             self.current_index = 0
         
-        if not self.cached_images:
+        if not self.cached_filenames:
             raise ValueError(f"No images found in path: {path} with pattern: {pattern}")
         
-        total_images = len(self.cached_images)
+        total_images = len(self.cached_filenames)
         print(f"[Load Image Batch Fun] Total images found: {total_images}")
         
-        # Select image based on mode
+        # Select image path based on mode
+        selected_path = None
         if mode == "single_image":
             # Use the specified index, wrap around if needed
             selected_index = index % total_images
-            selected_image = self.cached_images[selected_index]
-            selected_filename = self.cached_filenames[selected_index]
+            selected_path = self.cached_filenames[selected_index]
             print(f"[Load Image Batch Fun] Single image mode - selected index: {selected_index}")
             
         elif mode == "incremental_image":
             # Use current index and increment
             selected_index = self.current_index % total_images
-            selected_image = self.cached_images[selected_index]
-            selected_filename = self.cached_filenames[selected_index]
+            selected_path = self.cached_filenames[selected_index]
             self.current_index += 1
             print(f"[Load Image Batch Fun] Incremental mode - selected index: {selected_index}, next: {self.current_index}")
             
@@ -98,19 +94,24 @@ class LoadImageBatchFun:
             # Random selection
             import random
             selected_index = random.randint(0, total_images - 1)
-            selected_image = self.cached_images[selected_index]
-            selected_filename = self.cached_filenames[selected_index]
+            selected_path = self.cached_filenames[selected_index]
             print(f"[Load Image Batch Fun] Random mode - selected index: {selected_index}")
         
         else:
             raise ValueError(f"Invalid mode: {mode}")
+
+        # Load the selected image
+        selected_image = self._load_image(selected_path, allow_RGBA_output)
+        
+        # Get filename without extension
+        selected_filename = os.path.splitext(os.path.basename(selected_path))[0]
         
         return (selected_image, selected_filename, total_images)
 
-    def _load_images_from_path(self, path, pattern, allow_RGBA_output):
+    def _load_images_from_path(self, path, pattern):
         """
-        Load all images from the specified path matching the pattern.
-        Returns lists of image tensors and filenames.
+        Get all image file paths from the specified path matching the pattern.
+        Returns a sorted list of full file paths.
         """
         import glob
         
@@ -133,23 +134,11 @@ class LoadImageBatchFun:
         image_files.sort()
         
         if not image_files:
-            return [], []
+            return []
         
         print(f"[Load Image Batch Fun] Found {len(image_files)} image files")
         
-        images = []
-        filenames = []
-        
-        for img_path in image_files:
-            try:
-                img = self._load_image(img_path, allow_RGBA_output)
-                images.append(img)
-                filenames.append(os.path.basename(img_path))
-            except Exception as e:
-                print(f"[Load Image Batch Fun] Error loading {img_path}: {str(e)}")
-                continue
-        
-        return images, filenames
+        return image_files
 
     def _load_image(self, image_path, allow_RGBA_output):
         """

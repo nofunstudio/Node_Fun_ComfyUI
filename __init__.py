@@ -9,6 +9,7 @@ from .ksampler_fun import KSampler
 from .fal_recraft_upscale import FalAPI_recraft_upscale
 from .fal_kling_video import FalAPI_kling_video
 from .fal_seedance_video import FalAPI_seedance_video
+from .wavespeed_ai_image import WaveSpeedAI_Image
 from .string_lower import StringLower
 from .multi_alpha_composite import MultiAlphaComposite
 from .flux_kontext_inpaint_conditioning import FluxKontextInpaintingConditioning
@@ -26,6 +27,7 @@ NODE_CLASS_MAPPINGS = {
     "FalAPI_recraft_upscale": FalAPI_recraft_upscale,
     "FalAPI_kling_video": FalAPI_kling_video,
     "FalAPI_seedance_video": FalAPI_seedance_video,
+    "WaveSpeedAI_Image": WaveSpeedAI_Image,
     "StringLower": StringLower,
     "MultiAlphaComposite": MultiAlphaComposite,
     "FluxKontextInpaintingConditioning": FluxKontextInpaintingConditioning,
@@ -42,6 +44,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FalAPI_recraft_upscale": "Fal API Recraft Upscale",
     "FalAPI_kling_video": "Fal API Kling Video",
     "FalAPI_seedance_video": "Fal API Seedance Video",
+    "WaveSpeedAI_Image": "WaveSpeedAI Image Generation",
     "StringLower": "String to Lowercase",
     "MultiAlphaComposite": "Multi Alpha Composite",
     "FluxKontextInpaintingConditioning": "No Fun Flux Kontext Inpaint Conditioning",
