@@ -165,39 +165,115 @@ class FalAPI_NanoBananaPro:
             arguments = {
                 "prompt": prompt,
                 "num_images": num_images,
-                "images": image_urls,
+                "image_urls": image_urls,
                 "resolution": resolution,
-                "enable_safety_checker": False
+                "output_format": "png",
+                "sync_mode": False
             }
 
             # Handle aspect ratio or custom resolution
             if aspect_ratio != "custom":
                  arguments["aspect_ratio"] = aspect_ratio
 
+            # Seed handling
             if seed != -1:
                 arguments["seed"] = seed
 
             print(f"[NanoBananaPro] Arguments: {json.dumps(arguments, indent=2)}")
 
-            # Call API
-            endpoint = "fal-ai/nano-banana-pro"
+            # Manual submission to get request_id for polling control
+            submit_url = "https://queue.fal.run/fal-ai/nano-banana-pro/edit"
+            headers = {
+                "Authorization": f"Key {api_key}",
+                "Content-Type": "application/json"
+            }
             
-            print(f"[NanoBananaPro] Submitting to {endpoint}...")
+            print(f"[NanoBananaPro] Submitting job to {submit_url}...")
             
-            # Run blocking subscribe call in thread pool
-            result = await asyncio.to_thread(
-                fal_client.subscribe,
-                endpoint,
-                arguments=arguments,
-                with_logs=True,
-                on_queue_update=self.on_queue_update,
-            )
+            # Submit job
+            response = await asyncio.to_thread(requests.post, submit_url, headers=headers, json=arguments)
+            
+            if response.status_code != 200:
+                 raise RuntimeError(f"Submission failed: {response.status_code} {response.text}")
+                 
+            data = response.json()
+            request_id = data.get("request_id")
+            if not request_id:
+                raise RuntimeError(f"No request_id in response: {data}")
+                
+            print(f"[NanoBananaPro] Request ID: {request_id}")
+            
+            status_url = f"https://queue.fal.run/fal-ai/nano-banana-pro/requests/{request_id}/status?logs=true"
+            result_url = f"https://queue.fal.run/fal-ai/nano-banana-pro/requests/{request_id}"
+            
+            start_time = time.time()
+            TIMEOUT = 75
+            
+            result = None
+            
+            # Manual polling loop
+            while True:
+                if time.time() - start_time > TIMEOUT:
+                    print("[NanoBananaPro] API request timed out after 75 seconds. Returning black image.")
+                    
+                    # Stop polling, return black image
+                    size_map = {"1K": 1024, "2K": 2048, "4K": 4096}
+                    dim = size_map.get(resolution, 1024)
+                    
+                    batch_size = num_images
+                    black_tensor = torch.zeros((batch_size, dim, dim, 3))
+                    
+                    timeout_info = {
+                        "error": "Timeout",
+                        "message": "API request timed out after 75 seconds",
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "prompt": prompt
+                    }
+                    
+                    black_pil = Image.new("RGB", (dim, dim), (0, 0, 0))
+                    
+                    saved_paths = []
+                    for _ in range(batch_size):
+                        number = self.get_next_number()
+                        path, _ = await asyncio.to_thread(self.save_image_and_metadata, black_pil, timeout_info, number)
+                        saved_paths.append(path)
+                    
+                    return (black_tensor, ";".join(saved_paths), json.dumps(timeout_info, indent=2))
+                
+                # Check status
+                try:
+                    status_resp = await asyncio.to_thread(requests.get, status_url, headers=headers)
+                    if status_resp.status_code == 200:
+                        status_data = status_resp.json()
+                        status = status_data.get("status")
+                        
+                        # Print logs if available
+                        logs = status_data.get("logs", [])
+                        if logs:
+                            for log in logs:
+                                msg = log.get("message", "")
+                                if msg: print(f"[NanoBananaPro] {msg}")
+
+                        if status == "COMPLETED":
+                            # Fetch result
+                            result_resp = await asyncio.to_thread(requests.get, result_url, headers=headers)
+                            result = result_resp.json()
+                            break
+                        elif status == "FAILED":
+                            error_msg = status_data.get("error", "Unknown error")
+                            raise RuntimeError(f"Job failed: {error_msg}")
+                except requests.exceptions.RequestException as e:
+                    print(f"[NanoBananaPro] Network error checking status: {e}")
+                    # Continue polling loop despite network error, unless timeout is reached
+                    await asyncio.sleep(1)
+                    continue
+                
+                await asyncio.sleep(1)
 
             # Process results
             if not result:
                 raise RuntimeError("No result returned from API")
             
-            # Assume result contains 'images' list or 'image' dict
             output_images = []
             if "images" in result:
                 output_images = result["images"]
