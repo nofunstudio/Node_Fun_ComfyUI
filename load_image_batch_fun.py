@@ -18,7 +18,7 @@ class LoadImageBatchFun:
                 "mode": (["single_image", "incremental_image", "random"],),
                 "index": ("INT", {"default": 0, "min": 0, "max": 150000, "step": 1}),
                 "label": ("STRING", {"default": "Batch"}),
-                "path": ("STRING", {"default": "", "multiline": False}),
+                "path": ("STRING", {"default": ""}),
                 "pattern": ("STRING", {"default": "*", "multiline": False}),
                 "allow_RGBA_output": (["false", "true"],),
             },
@@ -193,7 +193,7 @@ class LoadImageBatchFun:
         Validate inputs before execution.
         """
         if not path or path.strip() == "":
-            return "Path cannot be empty"
+            return True
         
         expanded_path = os.path.expanduser(path)
         if not os.path.exists(expanded_path):

@@ -80,6 +80,7 @@ class FalAPI_seedance_video:
                 }),
             },
             "optional": {
+                "end_image": ("IMAGE", {"display": "End Image (optional)"}),
                 "seed": ("INT", {
                     "default": -1,
                     "min": -1,
@@ -138,7 +139,7 @@ class FalAPI_seedance_video:
             print(f"[Seedance Video] Error in queue update: {e}")
 
     async def generate_video(self, api_token, image, prompt, aspect_ratio, resolution, 
-                      duration, camera_fixed, enable_safety_checker, seed=-1):
+                      duration, camera_fixed, enable_safety_checker, end_image=None, seed=-1):
         """
         Generate video using fal-ai/bytedance/seedance/v1/pro/image-to-video
         (Async execution for parallel processing)
@@ -185,6 +186,12 @@ class FalAPI_seedance_video:
             try:
                 temp_file_path = await asyncio.to_thread(self.tensor_to_tempfile, image)
                 print(f"[Seedance Video] Created temp file: {temp_file_path}")
+                
+                # Handle end_image if provided
+                end_image_temp_path = None
+                if end_image is not None:
+                    end_image_temp_path = await asyncio.to_thread(self.tensor_to_tempfile, end_image)
+                    print(f"[Seedance Video] Created end_image temp file: {end_image_temp_path}")
             except Exception as e:
                 print(f"[Seedance Video] Error creating temp file: {str(e)}")
                 raise
@@ -194,11 +201,21 @@ class FalAPI_seedance_video:
                 print(f"[Seedance Video] Uploading image to FAL storage...")
                 image_url = await asyncio.to_thread(fal_client.upload_file, temp_file_path)
                 print(f"[Seedance Video] Image uploaded successfully: {image_url}")
+                
+                # Upload end_image if provided
+                end_image_url = None
+                if end_image_temp_path:
+                    print(f"[Seedance Video] Uploading end_image to FAL storage...")
+                    end_image_url = await asyncio.to_thread(fal_client.upload_file, end_image_temp_path)
+                    print(f"[Seedance Video] End image uploaded successfully: {end_image_url}")
+                    
             except Exception as e:
                 print(f"[Seedance Video] Error uploading file: {str(e)}")
                 # Clean up file before re-raising
                 try:
                     os.remove(temp_file_path)
+                    if end_image_temp_path:
+                        os.remove(end_image_temp_path)
                 except:
                     pass
                 raise
@@ -213,6 +230,9 @@ class FalAPI_seedance_video:
                 "camera_fixed": camera_fixed,
                 "enable_safety_checker": enable_safety_checker
             }
+            
+            if end_image_url:
+                arguments["end_image_url"] = end_image_url
             
             # Add seed if it's not -1 (random)
             if seed != -1:
@@ -235,13 +255,17 @@ class FalAPI_seedance_video:
                 # Clean up file before re-raising
                 try:
                     os.remove(temp_file_path)
+                    if end_image_temp_path:
+                        os.remove(end_image_temp_path)
                 except:
                     pass
                 raise
 
             # 6) Clean up temporary file
             os.remove(temp_file_path)
-            print(f"[Seedance Video] Cleaned up temp file")
+            if end_image_temp_path:
+                os.remove(end_image_temp_path)
+            print(f"[Seedance Video] Cleaned up temp files")
 
             if not result or not result.get("video"):
                 raise ValueError("No valid video result from fal_client.subscribe().")
