@@ -11,6 +11,7 @@ from .fal_kling_video import FalAPI_kling_video
 from .fal_seedance_video import FalAPI_seedance_video
 from .nano_banana_pro import FalAPI_NanoBananaPro
 from .fal_qwen_edit import FalAPI_QwenEditPlus
+from .fal_flux2_lora_edit import FalAPI_Flux2LoraEdit
 from .wavespeed_ai_image import WaveSpeedAI_Image
 from .string_lower import StringLower
 from .multi_alpha_composite import MultiAlphaComposite
@@ -31,6 +32,7 @@ NODE_CLASS_MAPPINGS = {
     "FalAPI_seedance_video": FalAPI_seedance_video,
     "FalAPI_NanoBananaPro": FalAPI_NanoBananaPro,
     "FalAPI_QwenEditPlus": FalAPI_QwenEditPlus,
+    "FalAPI_Flux2LoraEdit": FalAPI_Flux2LoraEdit,
     "WaveSpeedAI_Image": WaveSpeedAI_Image,
     "StringLower": StringLower,
     "MultiAlphaComposite": MultiAlphaComposite,
@@ -50,6 +52,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FalAPI_seedance_video": "Fal API Seedance Video",
     "FalAPI_NanoBananaPro": "Nano Banana Pro (FAL)",
     "FalAPI_QwenEditPlus": "FAL Qwen Edit Plus",
+    "FalAPI_Flux2LoraEdit": "FAL Flux 2 LoRA Edit",
     "WaveSpeedAI_Image": "WaveSpeedAI Image Generation",
     "StringLower": "String to Lowercase",
     "MultiAlphaComposite": "Multi Alpha Composite",
