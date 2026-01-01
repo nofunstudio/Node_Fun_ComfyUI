@@ -206,7 +206,7 @@ class FalAPI_QwenEditPlus:
 
             print(f"[QwenEditPlus] Arguments: {json.dumps(arguments, indent=2)}")
             
-            endpoint = "fal-ai/qwen-image-edit-plus-lora"
+            endpoint = "fal-ai/qwen-image-edit-2511/lora"
             print(f"[QwenEditPlus] Submitting to {endpoint}...")
 
             # Call API

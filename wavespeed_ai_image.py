@@ -127,7 +127,7 @@ class WaveSpeedAI_Image:
                 payload["seed"] = seed
 
             print("[WaveSpeedAI] Submitting generation task...")
-            submit_url = "https://api.wavespeed.ai/api/v3/wavespeed-ai/qwen-image/edit-plus-lora"
+            submit_url = "https://api.wavespeed.ai/api/v3/wavespeed-ai/qwen-image/edit-2511-lora"
             headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
             
             response = await asyncio.to_thread(requests.post, submit_url, headers=headers, data=json.dumps(payload))
