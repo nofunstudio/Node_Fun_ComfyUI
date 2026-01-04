@@ -17,7 +17,7 @@ class FalAPI_seedance_video:
     @classmethod
     def INPUT_TYPES(cls):
         """
-        A video generation node for `fal-ai/bytedance/seedance/v1/pro/image-to-video`.
+        A video generation node for `fal-ai/bytedance/seedance/v1.5/pro/image-to-video`.
         Takes an image input, prompt, and generates a video using Seedance Video API.
         """
         return {
@@ -73,6 +73,10 @@ class FalAPI_seedance_video:
                 "camera_fixed": ("BOOLEAN", {
                     "default": True,
                     "display": "Camera Fixed"
+                }),
+                "generate_audio": ("BOOLEAN", {
+                    "default": True,
+                    "display": "Generate Audio"
                 }),
                 "enable_safety_checker": ("BOOLEAN", {
                     "default": True,
@@ -139,9 +143,9 @@ class FalAPI_seedance_video:
             print(f"[Seedance Video] Error in queue update: {e}")
 
     async def generate_video(self, api_token, image, prompt, aspect_ratio, resolution, 
-                      duration, camera_fixed, enable_safety_checker, end_image=None, seed=-1):
+                      duration, camera_fixed, generate_audio, enable_safety_checker, end_image=None, seed=-1):
         """
-        Generate video using fal-ai/bytedance/seedance/v1/pro/image-to-video
+        Generate video using fal-ai/bytedance/seedance/v1.5/pro/image-to-video
         (Async execution for parallel processing)
         """
         print(f"[Seedance Video] Starting video generation process...")
@@ -169,7 +173,7 @@ class FalAPI_seedance_video:
         print(f"[Seedance Video] Input image shape: {image.shape}")
         print(f"[Seedance Video] Prompt: {prompt}")
         print(f"[Seedance Video] Settings: aspect_ratio={aspect_ratio}, resolution={resolution}, duration={duration}s")
-        print(f"[Seedance Video] Camera fixed: {camera_fixed}, Safety checker: {enable_safety_checker}")
+        print(f"[Seedance Video] Camera fixed: {camera_fixed}, Generate audio: {generate_audio}, Safety checker: {enable_safety_checker}")
 
         try:
             # 1) Set up FAL client with API token
@@ -228,6 +232,7 @@ class FalAPI_seedance_video:
                 "resolution": resolution,
                 "duration": duration,
                 "camera_fixed": camera_fixed,
+                "generate_audio": generate_audio,
                 "enable_safety_checker": enable_safety_checker
             }
             
@@ -244,7 +249,7 @@ class FalAPI_seedance_video:
             try:
                 result = await asyncio.to_thread(
                     fal_client.subscribe,
-                    "fal-ai/bytedance/seedance/v1/pro/image-to-video",
+                    "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
                     arguments=arguments,
                     with_logs=True,
                     on_queue_update=self.on_queue_update,
@@ -286,13 +291,14 @@ class FalAPI_seedance_video:
             
             generation_info = {
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "model": "fal-ai/bytedance/seedance/v1/pro/image-to-video",
+                "model": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
                 "parameters": {
                     "prompt": prompt,
                     "aspect_ratio": aspect_ratio,
                     "resolution": resolution,
                     "duration": duration,
                     "camera_fixed": camera_fixed,
+                    "generate_audio": generate_audio,
                     "enable_safety_checker": enable_safety_checker,
                     "seed": seed if seed != -1 else seed_used
                 },
@@ -319,7 +325,7 @@ class FalAPI_seedance_video:
             error_info = {
                 "error": f"Seedance video generation failed: {str(e)}",
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "model": "fal-ai/bytedance/seedance/v1/pro/image-to-video"
+                "model": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video"
             }
             print(f"[Seedance Video] Error: {str(e)}")
             return (None, empty_path, json.dumps(error_info, indent=2))
