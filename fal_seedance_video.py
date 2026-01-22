@@ -41,18 +41,16 @@ class FalAPI_seedance_video:
                     "4:3",
                     "1:1",
                     "3:4",
-                    "9:16",
-                    "auto"
+                    "9:16"
                 ], {
                     "default": "3:4",
                     "display": "Aspect Ratio"
                 }),
                 "resolution": ([
                     "480p",
-                    "720p",
-                    "1080p"
+                    "720p"
                 ], {
-                    "default": "1080p",
+                    "default": "720p",
                     "display": "Resolution"
                 }),
                 "duration": ([
