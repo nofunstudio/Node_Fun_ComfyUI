@@ -33,8 +33,8 @@ class FalAPI_recraft_upscale:
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "STRING",)
-    RETURN_NAMES = ("upscaled_image", "generation_info",)
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING",)
+    RETURN_NAMES = ("upscaled_image", "generation_info", "generation_time",)
     FUNCTION = "upscale"
     CATEGORY = "FAL"
 
@@ -105,11 +105,18 @@ class FalAPI_recraft_upscale:
         except Exception as e:
             print(f"[Recraft Upscale] Error in queue update: {e}")
 
+    def format_generation_time(self, elapsed_seconds):
+        """Format elapsed time as 'seconds-centiseconds' (e.g., '14-50' for 14.50 seconds)"""
+        seconds = int(elapsed_seconds)
+        centiseconds = int((elapsed_seconds - seconds) * 100)
+        return f"{seconds}-{centiseconds:02d}"
+
     def upscale(self, api_token, image, enable_safety_checker):
         """
         Upscale image using fal-ai/recraft/upscale/crisp
         """
         print(f"[Recraft Upscale] Starting upscale process...")
+        start_time = time.time()
         
         # For errors, return an empty 1024x1024 image
         empty_image = torch.zeros((1, 1024, 1024, 3))
@@ -241,7 +248,9 @@ class FalAPI_recraft_upscale:
             print(f"[Recraft Upscale] Final tensor shape: {img_tensor.shape}")
 
             # 11) Return the image tensor & metadata JSON string
-            return (img_tensor, json.dumps(generation_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            print(f"[Recraft Upscale] Upscale completed in {generation_time} seconds")
+            return (img_tensor, json.dumps(generation_info, indent=2), generation_time)
 
         except Exception as e:
             # Return an empty image and an error message in JSON
@@ -251,7 +260,8 @@ class FalAPI_recraft_upscale:
                 "model": "fal-ai/recraft/upscale/crisp"
             }
             print(f"[Recraft Upscale] Error: {str(e)}")
-            return (empty_image, json.dumps(error_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            return (empty_image, json.dumps(error_info, indent=2), generation_time)
 
     def tensor_to_tempfile(self, tensor):
         """

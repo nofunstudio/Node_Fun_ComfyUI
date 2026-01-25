@@ -72,8 +72,8 @@ class FalAPI_NanoBananaPro:
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "STRING", "STRING",)
-    RETURN_NAMES = ("images", "image_paths", "generation_info",)
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING", "STRING",)
+    RETURN_NAMES = ("images", "image_paths", "generation_info", "generation_time",)
     FUNCTION = "generate_image"
     CATEGORY = "FAL"
 
@@ -132,9 +132,16 @@ class FalAPI_NanoBananaPro:
         arr = (arr * 255).clip(0, 255).astype("uint8")
         return Image.fromarray(arr)
 
+    def format_generation_time(self, elapsed_seconds):
+        """Format elapsed time as 'seconds-centiseconds' (e.g., '14-50' for 14.50 seconds)"""
+        seconds = int(elapsed_seconds)
+        centiseconds = int((elapsed_seconds - seconds) * 100)
+        return f"{seconds}-{centiseconds:02d}"
+
     async def generate_image(self, api_key, prompt, num_images, image1, aspect_ratio, resolution,
                        image2=None, image3=None, image4=None, seed=-1):
         print("[NanoBananaPro] Starting generation process...")
+        start_time = time.time()
 
         if not api_key:
             raise ValueError("A FAL API Key is required.")
@@ -238,7 +245,8 @@ class FalAPI_NanoBananaPro:
                         path, _ = await asyncio.to_thread(self.save_image_and_metadata, black_pil, timeout_info, number)
                         saved_paths.append(path)
                     
-                    return (black_tensor, ";".join(saved_paths), json.dumps(timeout_info, indent=2))
+                    generation_time = self.format_generation_time(time.time() - start_time)
+                    return (black_tensor, ";".join(saved_paths), json.dumps(timeout_info, indent=2), generation_time)
                 
                 # Check status
                 try:
@@ -326,7 +334,9 @@ class FalAPI_NanoBananaPro:
             else:
                 batch_tensor = final_tensors[0]
 
-            return (batch_tensor, ";".join(saved_paths), json.dumps(result, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            print(f"[NanoBananaPro] Generation completed in {generation_time} seconds")
+            return (batch_tensor, ";".join(saved_paths), json.dumps(result, indent=2), generation_time)
 
         except Exception as e:
             print(f"[NanoBananaPro] Error: {e}")
@@ -337,7 +347,8 @@ class FalAPI_NanoBananaPro:
             
             # Return empty/error
             empty = torch.zeros((1, 64, 64, 3))
-            return (empty, "", str(e))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            return (empty, "", str(e), generation_time)
         
         finally:
              # Cleanup temp inputs

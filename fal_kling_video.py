@@ -34,8 +34,8 @@ class FalAPI_kling_video:
             }
         }
 
-    RETURN_TYPES = ("STRING", "STRING",)
-    RETURN_NAMES = ("video_path", "generation_info",)
+    RETURN_TYPES = ("STRING", "STRING", "STRING",)
+    RETURN_NAMES = ("video_path", "generation_info", "generation_time",)
     FUNCTION = "generate_video"
     CATEGORY = "FAL"
 
@@ -107,11 +107,18 @@ class FalAPI_kling_video:
         except Exception as e:
             print(f"[Kling Video] Error in queue update: {e}")
 
+    def format_generation_time(self, elapsed_seconds):
+        """Format elapsed time as 'seconds-centiseconds' (e.g., '14-50' for 14.50 seconds)"""
+        seconds = int(elapsed_seconds)
+        centiseconds = int((elapsed_seconds - seconds) * 100)
+        return f"{seconds}-{centiseconds:02d}"
+
     def generate_video(self, api_token, image, prompt):
         """
         Generate video using fal-ai/kling-video/v2.1/standard/image-to-video
         """
         print(f"[Kling Video] Starting video generation process...")
+        start_time = time.time()
         
         # For errors, return empty strings
         empty_path = ""
@@ -231,7 +238,9 @@ class FalAPI_kling_video:
             print(f"[Kling Video] Saved metadata -> {metadata_path}")
 
             # 10) Return the video path & metadata JSON string
-            return (video_path, json.dumps(generation_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            print(f"[Kling Video] Generation completed in {generation_time} seconds")
+            return (video_path, json.dumps(generation_info, indent=2), generation_time)
 
         except Exception as e:
             # Return empty path and an error message in JSON
@@ -241,7 +250,8 @@ class FalAPI_kling_video:
                 "model": "fal-ai/kling-video/v2.1/standard/image-to-video"
             }
             print(f"[Kling Video] Error: {str(e)}")
-            return (empty_path, json.dumps(error_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            return (empty_path, json.dumps(error_info, indent=2), generation_time)
 
     def tensor_to_tempfile(self, tensor):
         """

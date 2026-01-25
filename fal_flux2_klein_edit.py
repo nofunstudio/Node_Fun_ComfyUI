@@ -94,8 +94,8 @@ class FalAPI_Flux2KleinEdit:
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "STRING", "STRING",)
-    RETURN_NAMES = ("image", "image_path", "generation_info",)
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING", "STRING",)
+    RETURN_NAMES = ("image", "image_path", "generation_info", "generation_time",)
     FUNCTION = "generate_image"
     CATEGORY = "FAL"
 
@@ -165,12 +165,19 @@ class FalAPI_Flux2KleinEdit:
         mean_val = tensor.mean().item()
         return mean_val < 0.01
 
+    def format_generation_time(self, elapsed_seconds):
+        """Format elapsed time as 'seconds-centiseconds' (e.g., '14-50' for 14.50 seconds)"""
+        seconds = int(elapsed_seconds)
+        centiseconds = int((elapsed_seconds - seconds) * 100)
+        return f"{seconds}-{centiseconds:02d}"
+
     async def generate_image(self, api_key, model_variant, prompt, image1, width, height,
                              image2=None, image3=None, negative_prompt="", num_inference_steps=28, 
                              guidance_scale=5.0, lora_url="", lora_scale=1.0, seed=-1, 
                              output_format="png", enable_safety_checker=True, acceleration="none"):
         
         print(f"[Flux2KleinEdit] Starting image generation process with {model_variant} model...")
+        start_time = time.time()
         
         if not api_key:
             raise ValueError("A FAL API key is required.")
@@ -283,7 +290,9 @@ class FalAPI_Flux2KleinEdit:
             else:
                 batch_tensor = final_tensors[0]
 
-            return (batch_tensor, ";".join(saved_paths), json.dumps(result, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            print(f"[Flux2KleinEdit] Generation completed in {generation_time} seconds")
+            return (batch_tensor, ";".join(saved_paths), json.dumps(result, indent=2), generation_time)
 
         except Exception as e:
             print(f"[Flux2KleinEdit] Error: {str(e)}")
@@ -296,7 +305,8 @@ class FalAPI_Flux2KleinEdit:
                 "error": f"Flux2KleinEdit generation failed: {str(e)}",
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             }
-            return (torch.zeros((1, 64, 64, 3)), "", json.dumps(error_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            return (torch.zeros((1, 64, 64, 3)), "", json.dumps(error_info, indent=2), generation_time)
         
         finally:
             # Cleanup temp inputs

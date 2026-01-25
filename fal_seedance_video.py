@@ -92,8 +92,8 @@ class FalAPI_seedance_video:
             }
         }
 
-    RETURN_TYPES = ("VIDEO", "STRING", "STRING",)
-    RETURN_NAMES = ("video", "video_path", "generation_info",)
+    RETURN_TYPES = ("VIDEO", "STRING", "STRING", "STRING",)
+    RETURN_NAMES = ("video", "video_path", "generation_info", "generation_time",)
     FUNCTION = "generate_video"
     CATEGORY = "FAL"
 
@@ -140,6 +140,12 @@ class FalAPI_seedance_video:
         except Exception as e:
             print(f"[Seedance Video] Error in queue update: {e}")
 
+    def format_generation_time(self, elapsed_seconds):
+        """Format elapsed time as 'seconds-centiseconds' (e.g., '14-50' for 14.50 seconds)"""
+        seconds = int(elapsed_seconds)
+        centiseconds = int((elapsed_seconds - seconds) * 100)
+        return f"{seconds}-{centiseconds:02d}"
+
     async def generate_video(self, api_token, image, prompt, aspect_ratio, resolution, 
                       duration, camera_fixed, generate_audio, enable_safety_checker, end_image=None, seed=-1):
         """
@@ -147,6 +153,7 @@ class FalAPI_seedance_video:
         (Async execution for parallel processing)
         """
         print(f"[Seedance Video] Starting video generation process...")
+        start_time = time.time()
         
         # For errors, return empty strings
         empty_path = ""
@@ -316,7 +323,9 @@ class FalAPI_seedance_video:
             video_output = VideoFromFile(video_path)
             
             # 11) Return the video object, video path string & metadata JSON string
-            return (video_output, video_path, json.dumps(generation_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            print(f"[Seedance Video] Generation completed in {generation_time} seconds")
+            return (video_output, video_path, json.dumps(generation_info, indent=2), generation_time)
 
         except Exception as e:
             # Return None for video, empty path and an error message in JSON
@@ -326,7 +335,8 @@ class FalAPI_seedance_video:
                 "model": "fal-ai/bytedance/seedance/v1.5/pro/image-to-video"
             }
             print(f"[Seedance Video] Error: {str(e)}")
-            return (None, empty_path, json.dumps(error_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            return (None, empty_path, json.dumps(error_info, indent=2), generation_time)
 
     def tensor_to_tempfile(self, tensor):
         """

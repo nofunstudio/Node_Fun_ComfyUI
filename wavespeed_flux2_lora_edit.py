@@ -57,8 +57,8 @@ class WaveSpeedAI_Flux2LoraEdit:
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "STRING", "STRING",)
-    RETURN_NAMES = ("image", "image_path", "generation_info",)
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING", "STRING",)
+    RETURN_NAMES = ("image", "image_path", "generation_info", "generation_time",)
     FUNCTION = "generate_image"
     CATEGORY = "WaveSpeedAI"
 
@@ -100,10 +100,17 @@ class WaveSpeedAI_Flux2LoraEdit:
         img_array = np.array(pil_img).astype(np.float32) / 255.0
         return torch.from_numpy(img_array)[None,]
 
+    def format_generation_time(self, elapsed_seconds):
+        """Format elapsed time as 'seconds-centiseconds' (e.g., '14-50' for 14.50 seconds)"""
+        seconds = int(elapsed_seconds)
+        centiseconds = int((elapsed_seconds - seconds) * 100)
+        return f"{seconds}-{centiseconds:02d}"
+
     async def generate_image(self, api_key, prompt, image1, width, height, image2=None, image3=None, 
                              lora_url="", lora_scale=1.0, seed=-1):
         
         print("[WaveSpeedAI Flux2] Starting image generation process...")
+        start_time = time.time()
         
         if not api_key:
             raise ValueError("A WaveSpeedAI API key is required.")
@@ -215,7 +222,9 @@ class WaveSpeedAI_Flux2LoraEdit:
             pil_image = Image.open(BytesIO(resp.content)).convert("RGB")
             output_tensor = self.pil_to_tensor(pil_image)
             
-            return (output_tensor, image_path, json.dumps(generation_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            print(f"[WaveSpeedAI Flux2] Generation completed in {generation_time} seconds")
+            return (output_tensor, image_path, json.dumps(generation_info, indent=2), generation_time)
 
         except Exception as e:
             print(f"[WaveSpeedAI Flux2] Error: {str(e)}")
@@ -223,7 +232,8 @@ class WaveSpeedAI_Flux2LoraEdit:
                 "error": f"WaveSpeedAI Flux2 generation failed: {str(e)}",
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             }
-            return (torch.zeros((1, 64, 64, 3)), "", json.dumps(error_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            return (torch.zeros((1, 64, 64, 3)), "", json.dumps(error_info, indent=2), generation_time)
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):

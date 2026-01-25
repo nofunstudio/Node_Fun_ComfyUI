@@ -160,8 +160,8 @@ class FalAPI_ltx2_video:
             }
         }
 
-    RETURN_TYPES = ("VIDEO", "STRING", "STRING",)
-    RETURN_NAMES = ("video", "video_path", "generation_info",)
+    RETURN_TYPES = ("VIDEO", "STRING", "STRING", "STRING",)
+    RETURN_NAMES = ("video", "video_path", "generation_info", "generation_time",)
     FUNCTION = "generate_video"
     CATEGORY = "FAL"
 
@@ -230,6 +230,12 @@ class FalAPI_ltx2_video:
         arr = (arr * 255).clip(0, 255).astype("uint8")
         return Image.fromarray(arr)
 
+    def format_generation_time(self, elapsed_seconds):
+        """Format elapsed time as 'seconds-centiseconds' (e.g., '14-50' for 14.50 seconds)"""
+        seconds = int(elapsed_seconds)
+        centiseconds = int((elapsed_seconds - seconds) * 100)
+        return f"{seconds}-{centiseconds:02d}"
+
     async def generate_video(self, api_token, model_variant, image, prompt, num_frames, width, height, fps, image_strength,
                              negative_prompt="", guidance_scale=3.0, num_inference_steps=40, use_multiscale=True,
                              generate_audio=False, enable_safety_checker=True, acceleration="none",
@@ -239,6 +245,7 @@ class FalAPI_ltx2_video:
         """Generate video using fal-ai/ltx-2-19b/image-to-video/lora (Async execution)"""
         
         print(f"[LTX-2 Video] Starting video generation with {model_variant} model...")
+        start_time = time.time()
         
         empty_path = ""
         
@@ -397,7 +404,9 @@ class FalAPI_ltx2_video:
             # Create VideoFromFile object for ComfyUI's VIDEO type
             video_output = VideoFromFile(video_path)
             
-            return (video_output, video_path, json.dumps(generation_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            print(f"[LTX-2 Video] Generation completed in {generation_time} seconds")
+            return (video_output, video_path, json.dumps(generation_info, indent=2), generation_time)
 
         except Exception as e:
             # Clean up temp file on error
@@ -413,7 +422,8 @@ class FalAPI_ltx2_video:
                 "model": f"fal-ai/ltx-2-19b/{model_variant}/image-to-video/lora"
             }
             print(f"[LTX-2 Video] Error: {str(e)}")
-            return (None, empty_path, json.dumps(error_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            return (None, empty_path, json.dumps(error_info, indent=2), generation_time)
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):

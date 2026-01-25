@@ -63,8 +63,8 @@ class WaveSpeedAI_Image:
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "STRING", "STRING",)
-    RETURN_NAMES = ("image", "image_path", "generation_info",)
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING", "STRING",)
+    RETURN_NAMES = ("image", "image_path", "generation_info", "generation_time",)
     FUNCTION = "generate_image"
     CATEGORY = "WaveSpeedAI"
 
@@ -93,6 +93,7 @@ class WaveSpeedAI_Image:
                              image2=None, image3=None, lora_url="", lora_scale=0.84, 
                              seed=-1, output_format="jpeg"):
         print("[WaveSpeedAI] Starting image generation process...")
+        start_time = time.time()
         
         if not api_key:
             raise ValueError("A WaveSpeedAI API key is required.")
@@ -183,7 +184,9 @@ class WaveSpeedAI_Image:
             pil_image = Image.open(BytesIO(resp.content))
             output_tensor = self.pil_to_tensor(pil_image)
             
-            return (output_tensor, image_path, json.dumps(generation_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            print(f"[WaveSpeedAI] Generation completed in {generation_time} seconds")
+            return (output_tensor, image_path, json.dumps(generation_info, indent=2), generation_time)
 
         except Exception as e:
             error_info = {
@@ -191,7 +194,8 @@ class WaveSpeedAI_Image:
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             }
             print(f"[WaveSpeedAI] Error: {str(e)}")
-            return (None, "", json.dumps(error_info, indent=2))
+            generation_time = self.format_generation_time(time.time() - start_time)
+            return (None, "", json.dumps(error_info, indent=2), generation_time)
 
     def tensor_to_data_uri(self, tensor, image_format="PNG"):
         pil_img = self.tensor_to_pil(tensor)
@@ -209,6 +213,12 @@ class WaveSpeedAI_Image:
     def pil_to_tensor(self, pil_img):
         img_array = np.array(pil_img).astype(np.float32) / 255.0
         return torch.from_numpy(img_array)[None,]
+
+    def format_generation_time(self, elapsed_seconds):
+        """Format elapsed time as 'seconds-centiseconds' (e.g., '14-50' for 14.50 seconds)"""
+        seconds = int(elapsed_seconds)
+        centiseconds = int((elapsed_seconds - seconds) * 100)
+        return f"{seconds}-{centiseconds:02d}"
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
