@@ -60,6 +60,9 @@ Edit images using Black Forest Labs' Flux 2 model with optional LoRA support. Ac
 #### **FAL Flux 2 Turbo Edit**
 A faster, streamlined version of Flux 2 editing optimized for quick iterations. Fewer parameters for simpler workflows when speed matters more than fine-tuning.
 
+#### **FAL Flux 2 Klein Edit (4B/9B)**
+Image editing using the Flux 2 Klein models. Toggle between the 4B (faster) and 9B (higher quality) model variants. Accepts up to 3 reference images with optional LoRA support and negative prompts. Empty/black images on inputs 2 and 3 are automatically ignored.
+
 #### **FAL Kling Video Generation**
 Generates video from a single image using Kling Video v2.1. Provide an image and a motion prompt to create AI-generated video clips. Output is saved as MP4.
 
