@@ -9,6 +9,7 @@ from .ksampler_fun import KSampler
 from .fal_recraft_upscale import FalAPI_recraft_upscale
 from .fal_kling_video import FalAPI_kling_video
 from .fal_seedance_video import FalAPI_seedance_video
+from .fal_ltx2_video import FalAPI_ltx2_video
 from .nano_banana_pro import FalAPI_NanoBananaPro
 from .fal_qwen_edit import FalAPI_QwenEditPlus
 from .fal_flux2_lora_edit import FalAPI_Flux2LoraEdit
@@ -33,6 +34,7 @@ NODE_CLASS_MAPPINGS = {
     "FalAPI_recraft_upscale": FalAPI_recraft_upscale,
     "FalAPI_kling_video": FalAPI_kling_video,
     "FalAPI_seedance_video": FalAPI_seedance_video,
+    "FalAPI_ltx2_video": FalAPI_ltx2_video,
     "FalAPI_NanoBananaPro": FalAPI_NanoBananaPro,
     "FalAPI_QwenEditPlus": FalAPI_QwenEditPlus,
     "FalAPI_Flux2LoraEdit": FalAPI_Flux2LoraEdit,
@@ -56,6 +58,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FalAPI_recraft_upscale": "Fal API Recraft Upscale",
     "FalAPI_kling_video": "Fal API Kling Video",
     "FalAPI_seedance_video": "Fal API Seedance Video",
+    "FalAPI_ltx2_video": "FAL LTX-2 Video Generation",
     "FalAPI_NanoBananaPro": "Nano Banana Pro (FAL)",
     "FalAPI_QwenEditPlus": "FAL Qwen Edit Plus",
     "FalAPI_Flux2LoraEdit": "FAL Flux 2 LoRA Edit",

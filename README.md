@@ -75,6 +75,17 @@ Video generation using ByteDance's Seedance v1.5 Pro model. Features include:
 - Auto-generated audio
 - Fixed or moving camera modes
 
+#### **FAL LTX-2 Video Generation**
+High-quality video generation using the LTX-2 19B model. Toggle between regular and distilled variants. Features include:
+- Frame count control (up to 257 frames)
+- Configurable resolution and FPS
+- Built-in camera motion LoRAs (dolly, pan, tilt, zoom)
+- Custom LoRA support for style control
+- Negative prompt support
+- Multiple output formats (MP4, ProRes, GIF)
+- Audio generation option
+- Multiscale processing for better quality
+
 #### **FAL Recraft Crisp Upscale**
 High-quality image upscaling using Recraft's crisp upscale model. Enhances image resolution while preserving sharp details and textures.
 
