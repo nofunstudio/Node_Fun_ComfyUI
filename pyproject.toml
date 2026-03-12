@@ -1,0 +1,14 @@
+[project]
+name = "node_fun_comfyui"
+description = "ComfyUI Custom Node Pack Layered Infinite Zoom Node"
+version = "1.0.0"
+license = {file = "LICENSE"}
+
+[project.urls]
+Repository = "https://github.com/nofunstudio/Node_Fun_ComfyUI"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "Node_Fun_ComfyUI"
+Icon = ""
